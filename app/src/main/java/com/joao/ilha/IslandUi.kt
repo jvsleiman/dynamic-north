@@ -168,7 +168,12 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         dim = Color(s.textColor).copy(alpha = 0.62f),
     )
 
-    val wide = minOf(screenW - 16, s.largeMaxWidth).dp
+    val wide = if (s.fullWidth) (screenW - 2 * s.sideMargin).dp else minOf(screenW - 16, s.largeMaxWidth).dp
+    val idleHasContent = when (s.idleStyle) {
+        IdleStyle.Simple -> false
+        IdleStyle.AppIcons, IdleStyle.Count -> notifs.isNotEmpty()
+        else -> true
+    }
     val baseW = s.width.dp
     val baseH = s.height.dp
     val grow = if (s.growWhenActive) baseH * 2 + 12.dp else 0.dp
@@ -179,7 +184,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val actionsH = if (s.showNotifActions && popupItem?.actions?.isNotEmpty() == true) 46.dp else 0.dp
     val rows = notifs.size.coerceIn(1, s.listRows)
     val (tw, th) = when (mode) {
-        Mode.Idle -> baseW to baseH
+        Mode.Idle -> (if (idleHasContent) baseW + baseH * 2 + 12.dp else baseW) to baseH
         Mode.Asleep -> (if (s.keepMiniWhenHidden) baseH else 1.dp) to baseH
         Mode.Media, Mode.Call -> baseW + grow to baseH
         Mode.Charging -> baseW + grow + 24.dp to baseH
@@ -210,6 +215,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     }
 
     val density = LocalDensity.current
+    // A janela precisa da largura total (ilha + bolinha dos dois lados).
+    val totalW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
+    LaunchedEffect(totalW, density.density) { actions.onWidth(with(density) { totalW.roundToPx() }) }
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
         Row(verticalAlignment = Alignment.Top) {
@@ -240,7 +248,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                     label = "content",
                 ) { m ->
                     when (m) {
-                        Mode.Idle -> IdleContent(if (s.showCount) notifs.size else 0)
+                        Mode.Idle -> IdleContent(s.idleStyle, notifs, baseH)
                         Mode.Asleep -> Box(Modifier.fillMaxSize())
                         Mode.Media -> media?.let { CompactMedia(it, baseH) }
                         Mode.Call -> call?.let { CompactCall(it, Color(s.callWaveColor)) }
@@ -318,13 +326,82 @@ private fun Bubble(size: Dp, bg: Color, content: @Composable () -> Unit) {
 
 // ---------- modos pequenos ----------
 
+/** Ilha parada: o meio fica livre para a câmera; o conteúdo vai nas pontas. */
 @Composable
-private fun IdleContent(count: Int) {
-    val c = LocalIslandColors.current
-    Box(Modifier.fillMaxSize().padding(horizontal = 10.dp), contentAlignment = Alignment.CenterEnd) {
-        if (count > 0) Text(count.toString(), color = c.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
+    val col = LocalIslandColors.current
+    val ic = LocalIconScale.current
+    val ctx = LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var battery by remember { mutableIntStateOf(batteryNow(ctx)) }
+    LaunchedEffect(style) {
+        while (style == IdleStyle.Clock || style == IdleStyle.Date || style == IdleStyle.Battery || style == IdleStyle.ClockBattery) {
+            now = System.currentTimeMillis()
+            battery = batteryNow(ctx)
+            delay(15_000)
+        }
+    }
+    val apps = remember(notifs) { notifs.distinctBy { it.pkg } }
+    val time = remember(now) { java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(now)) }
+    val date = remember(now) {
+        java.text.SimpleDateFormat("EEE d", java.util.Locale("pt", "BR")).format(java.util.Date(now)).replace(".", "")
+    }
+    val iconSize = (h - 14.dp) * ic
+    val timeText = @Composable { Text(time, color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+    Row(
+        Modifier.fillMaxSize().padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        // Ponta esquerda
+        Box {
+            when (style) {
+                IdleStyle.AppIcons -> apps.getOrNull(0)?.let { AppIconBadge(it, iconSize) }
+                IdleStyle.Count -> if (notifs.isNotEmpty()) Icon(Icons.Rounded.Notifications, null, tint = col.dim, modifier = Modifier.size((h - 18.dp) * ic))
+                IdleStyle.Clock, IdleStyle.ClockBattery -> timeText()
+                IdleStyle.Date -> Text(date, color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                else -> {}
+            }
+        }
+        // Ponta direita
+        Box {
+            when (style) {
+                IdleStyle.AppIcons -> when {
+                    apps.size > 2 -> Text("+${apps.size - 1}", color = col.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    apps.size == 2 -> AppIconBadge(apps[1], iconSize)
+                }
+                IdleStyle.Count -> if (notifs.isNotEmpty()) Text(notifs.size.toString(), color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Battery, IdleStyle.ClockBattery -> BatteryText(battery, h)
+                else -> {}
+            }
+        }
     }
 }
+
+@Composable
+private fun BatteryText(level: Int, h: Dp) {
+    val col = LocalIslandColors.current
+    val c = if (level <= 15) Red else col.text
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("$level%", color = c, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(3.dp))
+        BatteryGlyph(level, if (level <= 15) Red else Green, Modifier, h * 0.8f)
+    }
+}
+
+/** Ícone do app (o ícone colorido do launcher, não o da notificação). */
+@Composable
+private fun AppIconBadge(n: NotifItem, size: Dp) {
+    val ctx = LocalContext.current
+    val img = remember(n.pkg) {
+        runCatching { ctx.packageManager.getApplicationIcon(n.pkg).toBitmapSafe()?.asImageBitmap() }.getOrNull()
+    }
+    if (img != null) Image(img, null, modifier = Modifier.size(size).clip(CircleShape))
+    else NotifPicture(n, size)
+}
+
+private fun batteryNow(ctx: android.content.Context): Int =
+    (ctx.getSystemService(android.content.Context.BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
 
 @Composable
 private fun CompactMedia(m: MediaInfo, h: Dp) {

@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Display, Customize, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Display, Customize, Idle, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -115,7 +115,8 @@ fun HomeScreen(go: (Screen) -> Unit) {
         Group {
             SwitchRow("Barra da Ilha", s.enabled) { v -> s.set { copy(enabled = v) } }
             NavRow("Exibição") { go(Screen.Display) }
-            NavRow("Personalizar layouts", divider = false) { go(Screen.Customize) }
+            NavRow("Personalizar layouts") { go(Screen.Customize) }
+            NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
         Group("Recursos") {
             NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
@@ -185,9 +186,7 @@ fun DisplayScreen(back: () -> Unit) {
             SliderRow("Ilha pequena", s.smallRadius, 0..50, "%") { v -> s.set { copy(smallRadius = v) } }
             SliderRow("Ilha grande", s.largeRadius, 8..48, " dp", divider = false) { v -> s.set { copy(largeRadius = v) } }
         }
-        Group("Ilha grande", footer = "Largura máxima da ilha aberta (notificações, música, chamadas).") {
-            SliderRow("Largura máxima", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
-        }
+        WidthGroup(s)
         Group("Cores", footer = "A cor automática usa a capa da música ou a foto da notificação.") {
             SwitchRow("Cor de fundo automática", s.autoColor) { v -> s.set { copy(autoColor = v) } }
             ColorRow("Cor de fundo", s.bgColor) { v -> s.set { copy(bgColor = v) } }
@@ -229,7 +228,7 @@ fun NotificationsScreen(back: () -> Unit, go: (Screen) -> Unit) {
             SwitchRow("Mostrar conteúdo sensível", s.showSensitive, "Como códigos de verificação") { v -> s.set { copy(showSensitive = v) } }
             SwitchRow("Na tela de bloqueio", s.notifOnLockscreen) { v -> s.set { copy(notifOnLockscreen = v) } }
             SwitchRow("Botões da notificação", s.showNotifActions, "Responder, marcar como lida e outros, direto na ilha") { v -> s.set { copy(showNotifActions = v) } }
-            SwitchRow("Mostrar número de notificações", s.showCount, divider = false) { v -> s.set { copy(showCount = v) } }
+            NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
         Group("Não aparecem?", footer = "Desative e ative de novo o acesso às notificações do Ilha.") {
             val ctx = LocalContext.current
@@ -621,8 +620,35 @@ fun CustomizeScreen(back: () -> Unit) {
             SliderRow("Largura", s.width, 40..240, " dp") { v -> s.set { copy(width = v) } }
             SliderRow("Altura", s.height, 16..60, " dp") { v -> s.set { copy(height = v) } }
             SliderRow("Horizontal", s.offsetX, -180..180, " dp") { v -> s.set { copy(offsetX = v) } }
-            SliderRow("Vertical", s.offsetY, -40..160, " dp") { v -> s.set { copy(offsetY = v) } }
-            SliderRow("Largura máxima aberta", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
+            SliderRow("Vertical", s.offsetY, -40..160, " dp", divider = false) { v -> s.set { copy(offsetY = v) } }
+        }
+        WidthGroup(s)
+    }
+}
+
+@Composable
+private fun WidthGroup(s: Settings) {
+    Group("Ilha aberta", footer = "Largura das notificações, da música e das chamadas quando a ilha abre.") {
+        SwitchRow("Ocupar a largura da tela", s.fullWidth) { v -> s.set { copy(fullWidth = v) } }
+        if (s.fullWidth) {
+            SliderRow("Margem dos lados", s.sideMargin, 0..32, " dp", divider = false) { v -> s.set { copy(sideMargin = v) } }
+        } else {
+            SliderRow("Largura máxima", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
+        }
+    }
+}
+
+// ---------- ilha parada ----------
+
+@Composable
+fun IdleScreen(back: () -> Unit) {
+    val s by Prefs.state.collectAsState()
+    Page("Ilha parada", back) {
+        Group(
+            "Quando nada está acontecendo",
+            footer = "O meio da ilha fica livre para a câmera; a informação aparece nas pontas. Em \"Ícones dos apps\" e \"Número\", a ilha volta ao tamanho simples quando não há notificações.",
+        ) {
+            ChoiceRows(IdleStyle.entries, s.idleStyle, { it.label }) { v -> s.set { copy(idleStyle = v) } }
         }
     }
 }

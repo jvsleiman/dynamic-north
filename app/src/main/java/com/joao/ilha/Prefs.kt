@@ -23,6 +23,17 @@ enum class Motion(val label: String, val damping: Float, val stiffness: Float) {
 
 enum class BorderAnim(val label: String) { Off("Desligada"), Rainbow("Multicolorida"), Single("Uma cor") }
 
+/** O que a ilha mostra quando não há nada acontecendo. */
+enum class IdleStyle(val label: String) {
+    Simple("Simples (só a ilha)"),
+    AppIcons("Ícones dos apps com notificação"),
+    Count("Número de notificações"),
+    Clock("Hora"),
+    Date("Data"),
+    Battery("Bateria"),
+    ClockBattery("Hora e bateria"),
+}
+
 enum class AppTheme(val label: String) { System("Automático (sistema)"), Light("Claro"), Dark("Escuro") }
 
 /** Todos os ajustes. Tamanhos e posições em dp; cores em ARGB. */
@@ -40,6 +51,9 @@ data class Settings(
     val smallRadius: Int = 50,
     val largeRadius: Int = 36,
     val largeMaxWidth: Int = 400,
+    val fullWidth: Boolean = true,
+    val sideMargin: Int = 8,
+    val idleStyle: IdleStyle = IdleStyle.Simple,
     val bgColor: Long = 0xFF000000,
     val textColor: Long = 0xFFFFFFFF,
     val autoColor: Boolean = false,
@@ -130,6 +144,7 @@ object Prefs {
             width = d.width, height = d.height, offsetX = d.offsetX, offsetY = d.offsetY,
             alignToCamera = d.alignToCamera, growWhenActive = d.growWhenActive,
             smallRadius = d.smallRadius, largeRadius = d.largeRadius, largeMaxWidth = d.largeMaxWidth,
+            fullWidth = d.fullWidth, sideMargin = d.sideMargin,
             bgColor = d.bgColor, textColor = d.textColor, autoColor = d.autoColor,
             borderSmall = d.borderSmall, borderLarge = d.borderLarge, borderColor = d.borderColor,
             motion = d.motion,

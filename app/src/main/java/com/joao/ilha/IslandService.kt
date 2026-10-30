@@ -52,6 +52,7 @@ class IslandService : AccessibilityService() {
     private var params: WindowManager.LayoutParams? = null
     private var popupJob: Job? = null
     private var sleepJob: Job? = null
+    private var widthJob: Job? = null
 
     val ui = IslandUiState()
     private val foregroundPkg = MutableStateFlow("")
@@ -187,6 +188,7 @@ class IslandService : AccessibilityService() {
                         onSwipe = ::swipe,
                         onAction = ::runAction,
                         onDismiss = { key -> IslandBus.dismiss?.invoke(key) },
+                        onWidth = ::setWidth,
                         onOpen = ::openPkg,
                         onCollapse = ::collapse,
                     ),
@@ -204,6 +206,23 @@ class IslandService : AccessibilityService() {
         reposition()
         runCatching { wm.addView(v, p) }.onFailure { view = null; owner = null; o.destroy() }
         scheduleSleep()
+    }
+
+    /**
+     * Largura da janela em px. Com WRAP_CONTENT o Android limita a janela à largura de um
+     * diálogo (~320 dp), o que impedia a ilha aberta de ocupar a tela toda. Ao crescer
+     * aplica na hora; ao encolher espera a animação terminar.
+     */
+    private fun setWidth(px: Int) {
+        val p = params ?: return
+        widthJob?.cancel()
+        val apply = {
+            if (p.width != px) {
+                p.width = px
+                view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
+            }
+        }
+        if (p.width <= 0 || px >= p.width) apply() else widthJob = scope.launch { delay(650); apply() }
     }
 
     private fun removeOverlay() {
@@ -431,6 +450,7 @@ class IslandActions(
     val onSwipe: (Float) -> Unit,
     val onAction: (NotifItem, NotifAction) -> Unit,
     val onDismiss: (String) -> Unit,
+    val onWidth: (Int) -> Unit,
     val onOpen: (String?) -> Unit,
     val onCollapse: () -> Unit,
 )

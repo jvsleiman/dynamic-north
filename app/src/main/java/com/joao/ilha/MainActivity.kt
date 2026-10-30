@@ -26,6 +26,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Home -> HomeScreen(go)
                     Screen.Display -> DisplayScreen(back)
                     Screen.Customize -> CustomizeScreen(back)
+                    Screen.Idle -> IdleScreen(back)
                     Screen.Notifications -> NotificationsScreen(back, go)
                     Screen.Calls -> CallsScreen(back)
                     Screen.Music -> MusicScreen(back, go)
