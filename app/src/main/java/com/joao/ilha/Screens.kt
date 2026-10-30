@@ -15,6 +15,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Brush
@@ -648,20 +656,56 @@ private fun WidthGroup(s: Settings) {
 fun IdleScreen(back: () -> Unit) {
     val s by Prefs.state.collectAsState()
     val p = LocalPalette.current
+    val styles = IdleStyle.entries
+    val pager = rememberPagerState(initialPage = styles.indexOf(s.idleStyle).coerceAtLeast(0)) { styles.size }
+    val scope = rememberCoroutineScope()
     Page("Ilha parada", back) {
         Text(
-            "Escolha o que a ilha mostra quando nada está acontecendo. Tocar nela abre o layout do estilo (bateria, relógio ou notificações).",
+            "Deslize para ver os estilos e toque no card para usar. Tocar na ilha abre o layout do estilo.",
             color = p.secondary, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 14.dp),
         )
-        IdleStyle.entries.chunked(2).forEach { pair ->
-            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                pair.forEach { style ->
-                    IdleCard(style, style == s.idleStyle, Modifier.weight(1f)) { s.set { copy(idleStyle = style) } }
+        // Painel com degradê roxo → rosa e o carrossel de cards.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.horizontalGradient(listOf(Color(0xFF7E2E9C), Color(0xFFB0408F), Color(0xFFE2487A))))
+                .padding(vertical = 22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Estilos", color = Color(0xFFF6E8FA), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(18.dp))
+            HorizontalPager(
+                state = pager,
+                contentPadding = PaddingValues(horizontal = 56.dp),
+                pageSpacing = 12.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) { page ->
+                val style = styles[page]
+                // O card do meio fica maior; os dos lados encolhem e ficam um pouco transparentes.
+                val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction).let { kotlin.math.abs(it) }.coerceIn(0f, 1f)
+                val scale = 1f - 0.12f * offset
+                IdleCard(
+                    style, style == s.idleStyle,
+                    Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1f - 0.35f * offset },
+                ) {
+                    if (pager.currentPage != page) scope.launch { pager.animateScrollToPage(page) }
+                    else s.set { copy(idleStyle = style) }
                 }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                styles.indices.forEach { i ->
+                    Box(
+                        Modifier.height(6.dp).width(if (i == pager.currentPage) 18.dp else 6.dp).clip(CircleShape)
+                            .background(Color.White.copy(alpha = if (i == pager.currentPage) 0.95f else 0.45f)),
+                    )
+                }
             }
         }
+        Spacer(Modifier.height(18.dp))
         Group(footer = "Em \"Ícones dos apps\" e \"Número\", a ilha volta ao tamanho simples quando não há notificações.") {
+            NavRow("Usando agora", s.idleStyle.label) { scope.launch { pager.animateScrollToPage(styles.indexOf(s.idleStyle)) } }
             NavRow("Testar", divider = false) { IslandBus.show(Popup.Test) }
         }
     }
@@ -675,33 +719,41 @@ private val idleHints = mapOf(
     IdleStyle.Date to "Abre o relógio",
     IdleStyle.Battery to "Abre a bateria",
     IdleStyle.ClockBattery to "Abre o relógio",
+    IdleStyle.NetSpeed to "Abre o painel do sistema",
+    IdleStyle.Memory to "Abre o painel do sistema",
+    IdleStyle.Storage to "Abre o painel do sistema",
+    IdleStyle.Alarm to "Abre o relógio",
+    IdleStyle.Greeting to "Abre o relógio",
+    IdleStyle.Pulse to "Uma luz verde respirando",
 )
 
-/** Card com a pré-visualização do estilo numa "tela" escura. */
+/** Card claro como na referência: área de imagem com a ilha de exemplo, título e descrição. */
 @Composable
 private fun IdleCard(style: IdleStyle, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val p = LocalPalette.current
     Column(
         modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(p.card)
-            .border(if (selected) 2.5.dp else 0.dp, if (selected) Accent else Color.Transparent, RoundedCornerShape(16.dp))
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color(0xFFFBF3FD))
+            .border(if (selected) 3.dp else 0.dp, if (selected) Color.White else Color.Transparent, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(10.dp),
+            .padding(12.dp),
     ) {
         Box(
-            Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(12.dp))
-                .background(Brush.verticalGradient(listOf(Color(0xFF2B2D42), Color(0xFF14151F)))),
-            contentAlignment = Alignment.TopCenter,
+            Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFFEFC6F7)),
+            contentAlignment = Alignment.Center,
         ) {
-            IdlePill(style, Modifier.padding(top = 10.dp))
+            IdlePill(style, Modifier)
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(style.label, color = p.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 2)
-            if (selected) Icon(Icons.Rounded.CheckCircle, null, tint = Accent, modifier = Modifier.size(20.dp))
+            Text(style.label, color = Color(0xFF3B1748), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1)
+            if (selected) Icon(Icons.Rounded.CheckCircle, null, tint = Color(0xFFB0408F), modifier = Modifier.size(22.dp))
         }
-        Text(idleHints[style].orEmpty(), color = p.secondary, fontSize = 12.sp, maxLines = 2)
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xFFEFC6F7)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+            Text(if (selected) "Em uso" else idleHints[style].orEmpty(), color = Color(0xFF7E2E9C), fontSize = 12.sp, maxLines = 1)
+        }
     }
 }
 
@@ -709,21 +761,28 @@ private fun IdleCard(style: IdleStyle, selected: Boolean, modifier: Modifier, on
 @Composable
 private fun IdlePill(style: IdleStyle, modifier: Modifier) {
     val small = style == IdleStyle.Simple
-    val txt: @Composable (String) -> Unit = { Text(it, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold) }
-    val dot: @Composable (Color) -> Unit = { c -> Box(Modifier.size(13.dp).clip(CircleShape).background(c)) }
+    val txt: @Composable (String) -> Unit = { Text(it, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+    val dot: @Composable (Color) -> Unit = { c -> Box(Modifier.size(16.dp).clip(CircleShape).background(c)) }
+    val icon: @Composable (androidx.compose.ui.graphics.vector.ImageVector, Color) -> Unit = { v, c -> Icon(v, null, tint = c, modifier = Modifier.size(15.dp)) }
     Row(
-        modifier.width(if (small) 62.dp else 118.dp).height(22.dp).clip(RoundedCornerShape(11.dp)).background(Color.Black).padding(horizontal = 6.dp),
+        modifier.width(if (small) 84.dp else 156.dp).height(28.dp).clip(RoundedCornerShape(14.dp)).background(Color.Black).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         when (style) {
             IdleStyle.Simple -> {}
             IdleStyle.AppIcons -> { dot(Color(0xFF25D366)); dot(Color(0xFFE1306C)) }
-            IdleStyle.Count -> { Icon(Icons.Rounded.Notifications, null, tint = Color(0xFFB4B4BC), modifier = Modifier.size(12.dp)); txt("3") }
+            IdleStyle.Count -> { icon(Icons.Rounded.Notifications, Color(0xFFB4B4BC)); txt("3") }
             IdleStyle.Clock -> { txt("02:12"); Spacer(Modifier.width(1.dp)) }
             IdleStyle.Date -> { txt("qui 30"); Spacer(Modifier.width(1.dp)) }
             IdleStyle.Battery -> { Spacer(Modifier.width(1.dp)); BatteryMini() }
             IdleStyle.ClockBattery -> { txt("02:12"); BatteryMini() }
+            IdleStyle.NetSpeed -> { icon(Icons.Rounded.SwapVert, Color(0xFF64D2FF)); txt("1.2 MB/s") }
+            IdleStyle.Memory -> { icon(Icons.Rounded.Memory, Color(0xFFBF5AF2)); txt("41%") }
+            IdleStyle.Storage -> { icon(Icons.Rounded.Storage, Color(0xFFFF9F0A)); txt("64 GB") }
+            IdleStyle.Alarm -> { icon(Icons.Rounded.Alarm, Color(0xFFFF9F0A)); txt("sex 04:00") }
+            IdleStyle.Greeting -> { Text("🌙", fontSize = 11.sp); txt("Boa noite") }
+            IdleStyle.Pulse -> { Spacer(Modifier.width(1.dp)); Box(Modifier.size(9.dp).clip(CircleShape).background(SwitchGreen)) }
         }
     }
 }
@@ -731,10 +790,10 @@ private fun IdlePill(style: IdleStyle, modifier: Modifier) {
 @Composable
 private fun BatteryMini() {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("58%", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.width(2.dp))
-        Box(Modifier.width(14.dp).height(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3A3C))) {
-            Box(Modifier.fillMaxWidth(0.58f).height(8.dp).background(SwitchGreen))
+        Text("58%", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(3.dp))
+        Box(Modifier.width(17.dp).height(9.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3A3C))) {
+            Box(Modifier.fillMaxWidth(0.58f).height(9.dp).background(SwitchGreen))
         }
     }
 }

@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
-enum class ExpandKind { Activity, Battery, Clock, Notifications }
+enum class ExpandKind { Activity, Battery, Clock, Notifications, System }
 
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
@@ -56,7 +56,6 @@ class IslandService : AccessibilityService() {
     private var params: WindowManager.LayoutParams? = null
     private var popupJob: Job? = null
     private var sleepJob: Job? = null
-    private var widthJob: Job? = null
 
     val ui = IslandUiState()
     private val foregroundPkg = MutableStateFlow("")
@@ -214,19 +213,15 @@ class IslandService : AccessibilityService() {
 
     /**
      * Largura da janela em px. Com WRAP_CONTENT o Android limita a janela à largura de um
-     * diálogo (~320 dp), o que impedia a ilha aberta de ocupar a tela toda. Ao crescer
-     * aplica na hora; ao encolher espera a animação terminar.
+     * diálogo (~320 dp), o que impedia a ilha aberta de ocupar a tela toda. A interface só
+     * pede para encolher depois que a animação termina.
      */
     private fun setWidth(px: Int) {
         val p = params ?: return
-        widthJob?.cancel()
-        val apply = {
-            if (p.width != px) {
-                p.width = px
-                view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
-            }
+        if (p.width != px) {
+            p.width = px
+            view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
         }
-        if (p.width <= 0 || px >= p.width) apply() else widthJob = scope.launch { delay(650); apply() }
     }
 
     private fun removeOverlay() {
@@ -334,9 +329,10 @@ class IslandService : AccessibilityService() {
         if (ui.popup.value is Popup.Charging) return ExpandKind.Battery
         return when (Prefs.state.value.idleStyle) {
             IdleStyle.Battery -> ExpandKind.Battery
-            IdleStyle.Clock, IdleStyle.Date, IdleStyle.ClockBattery -> ExpandKind.Clock
+            IdleStyle.Clock, IdleStyle.Date, IdleStyle.ClockBattery, IdleStyle.Alarm, IdleStyle.Greeting -> ExpandKind.Clock
+            IdleStyle.NetSpeed, IdleStyle.Memory, IdleStyle.Storage -> ExpandKind.System
             IdleStyle.AppIcons, IdleStyle.Count -> ExpandKind.Notifications
-            IdleStyle.Simple -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Battery else ExpandKind.Notifications
+            IdleStyle.Simple, IdleStyle.Pulse -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Battery else ExpandKind.Notifications
         }
     }
 

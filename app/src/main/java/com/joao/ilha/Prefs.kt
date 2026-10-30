@@ -32,6 +32,12 @@ enum class IdleStyle(val label: String) {
     Date("Data"),
     Battery("Bateria"),
     ClockBattery("Hora e bateria"),
+    NetSpeed("Velocidade da internet"),
+    Memory("Memória livre"),
+    Storage("Armazenamento"),
+    Alarm("Próximo alarme"),
+    Greeting("Saudação"),
+    Pulse("Luz pulsando"),
 }
 
 enum class AppTheme(val label: String) { System("Automático (sistema)"), Light("Claro"), Dark("Escuro") }

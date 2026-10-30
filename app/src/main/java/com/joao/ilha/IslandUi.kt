@@ -49,7 +49,11 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryStd
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Call
 import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Forward10
@@ -125,7 +129,7 @@ private val LocalIslandColors = compositionLocalOf { IslandColors(Color.Black, C
 private enum class Mode(val large: Boolean) {
     Idle(false), Asleep(false), Media(false), Call(false), Charging(false), Bluetooth(false), SmallNotif(false),
     Notification(true), Test(true), IncomingCall(true),
-    ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true),
+    ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
 }
 
 @Composable
@@ -146,6 +150,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         expanded && kind == ExpandKind.Activity && media != null -> Mode.ExpandedMedia
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
+        expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
         expanded && notifs.isNotEmpty() -> Mode.ExpandedList
         expanded && media != null -> Mode.ExpandedMedia
         expanded -> Mode.ExpandedBattery
@@ -202,6 +207,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedList -> wide to (ListHeader + ListRow * rows) * t + 14.dp
         Mode.ExpandedBattery -> wide to 112.dp * k
         Mode.ExpandedClock -> wide to 132.dp * k * t
+        Mode.ExpandedSystem -> wide to 150.dp * k * t
     }
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
@@ -221,8 +227,18 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
 
     val density = LocalDensity.current
     // A janela precisa da largura total (ilha + bolinha dos dois lados).
-    val totalW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
-    LaunchedEffect(totalW, density.density) { actions.onWidth(with(density) { totalW.roundToPx() }) }
+    // Folga de 24 dp para a mola passar um pouco do tamanho final sem ser cortada.
+    val totalW = tw + 28.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
+    val targetPx = with(density) { totalW.roundToPx() }
+    // Só encolhe a janela quando a animação terminou; antes, a ilha ainda larga era espremida e "pulava".
+    val settled = abs((w - tw).value) < 0.5f
+    var reportedPx by remember { mutableIntStateOf(0) }
+    LaunchedEffect(targetPx, settled) {
+        if (targetPx > reportedPx || settled) {
+            reportedPx = targetPx
+            actions.onWidth(targetPx)
+        }
+    }
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
         // A janela pode ficar mais larga que a ilha (enquanto encolhe): mantém centralizada.
@@ -270,6 +286,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.ExpandedList -> NotificationList(notifs, actions)
                         Mode.ExpandedBattery -> BatteryCard()
                         Mode.ExpandedClock -> ClockCard()
+                        Mode.ExpandedSystem -> SystemCard()
                     }
                 }
             }
@@ -343,11 +360,14 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
     val ctx = LocalContext.current
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var battery by remember { mutableIntStateOf(batteryNow(ctx)) }
+    var netSpeed by remember { mutableLongStateOf(0L) }
     LaunchedEffect(style) {
-        while (style == IdleStyle.Clock || style == IdleStyle.Date || style == IdleStyle.Battery || style == IdleStyle.ClockBattery) {
+        val live = style != IdleStyle.Simple && style != IdleStyle.AppIcons && style != IdleStyle.Count && style != IdleStyle.Pulse
+        while (live) {
             now = System.currentTimeMillis()
             battery = batteryNow(ctx)
-            delay(15_000)
+            if (style == IdleStyle.NetSpeed) netSpeed = NetMeter.sample()
+            delay(if (style == IdleStyle.NetSpeed) 1_000 else 15_000)
         }
     }
     val apps = remember(notifs) { notifs.distinctBy { it.pkg } }
@@ -369,6 +389,11 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
                 IdleStyle.Count -> if (notifs.isNotEmpty()) Icon(Icons.Rounded.Notifications, null, tint = col.dim, modifier = Modifier.size((h - 18.dp) * ic))
                 IdleStyle.Clock, IdleStyle.ClockBattery -> timeText()
                 IdleStyle.Date -> Text(date, color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.NetSpeed -> Icon(Icons.Rounded.SwapVert, null, tint = Color(0xFF64D2FF), modifier = Modifier.size((h - 18.dp) * ic))
+                IdleStyle.Memory -> Icon(Icons.Rounded.Memory, null, tint = Color(0xFFBF5AF2), modifier = Modifier.size((h - 18.dp) * ic))
+                IdleStyle.Storage -> Icon(Icons.Rounded.Storage, null, tint = Color(0xFFFF9F0A), modifier = Modifier.size((h - 18.dp) * ic))
+                IdleStyle.Alarm -> Icon(Icons.Rounded.Alarm, null, tint = Color(0xFFFF9F0A), modifier = Modifier.size((h - 18.dp) * ic))
+                IdleStyle.Greeting -> Text(greetingEmoji(now), fontSize = 12.sp)
                 else -> {}
             }
         }
@@ -381,9 +406,80 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
                 }
                 IdleStyle.Count -> if (notifs.isNotEmpty()) Text(notifs.size.toString(), color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 IdleStyle.Battery, IdleStyle.ClockBattery -> BatteryText(battery, h)
+                IdleStyle.NetSpeed -> Text(formatSpeed(netSpeed), color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Memory -> Text("${remember(now) { SystemInfo.freeRamPercent(ctx) }}%", color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Storage -> Text("${remember(now) { SystemInfo.freeStorageGb() }} GB", color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Alarm -> Text(remember(now) { SystemInfo.nextAlarm(ctx) ?: "—" }, color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Greeting -> Text(greeting(now), color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                IdleStyle.Pulse -> PulseDot()
                 else -> {}
             }
         }
+    }
+}
+
+/** Pontinho que acende e apaga devagar, para a ilha parada não parecer "morta". */
+@Composable
+private fun PulseDot() {
+    val tr = rememberInfiniteTransition(label = "pulse")
+    val a by tr.animateFloat(0.25f, 1f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "a")
+    val sz by tr.animateFloat(6f, 10f, infiniteRepeatable(tween(1400), RepeatMode.Reverse), label = "s")
+    Box(Modifier.size(sz.dp).alpha(a).clip(CircleShape).background(Green))
+}
+
+private fun greeting(now: Long): String = when (java.util.Calendar.getInstance().apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "Bom dia"
+    in 12..17 -> "Boa tarde"
+    else -> "Boa noite"
+}
+
+private fun greetingEmoji(now: Long): String = when (java.util.Calendar.getInstance().apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)) {
+    in 5..11 -> "☀️"
+    in 12..17 -> "🌤️"
+    else -> "🌙"
+}
+
+private fun formatSpeed(bps: Long): String = when {
+    bps >= 1_000_000 -> "%.1f MB/s".format(bps / 1_000_000f)
+    bps >= 1_000 -> "${bps / 1_000} KB/s"
+    else -> "$bps B/s"
+}
+
+/** Ilha aberta a partir de Internet/Memória/Armazenamento. */
+@Composable
+private fun SystemCard() {
+    val col = LocalIslandColors.current
+    val ctx = LocalContext.current
+    var speed by remember { mutableLongStateOf(0L) }
+    var tick by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            speed = NetMeter.sample()
+            tick++
+            delay(1000)
+        }
+    }
+    val ram = remember(tick / 5) { SystemInfo.freeRamPercent(ctx) }
+    val storage = remember(tick / 30) { SystemInfo.freeStorageGb() }
+    val battery = remember(tick / 30) { batteryNow(ctx) }
+    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+        Stat(Icons.Rounded.SwapVert, Color(0xFF64D2FF), formatSpeed(speed), "Internet")
+        Stat(Icons.Rounded.Memory, Color(0xFFBF5AF2), "$ram%", "RAM livre")
+        Stat(Icons.Rounded.Storage, Color(0xFFFF9F0A), "$storage GB", "Livre")
+        Stat(Icons.Rounded.BatteryStd, Green, "$battery%", "Bateria")
+    }
+}
+
+@Composable
+private fun Stat(icon: ImageVector, tint: Color, value: String, label: String) {
+    val col = LocalIslandColors.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(tint.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(value, color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(label, color = col.dim, fontSize = 11.sp, maxLines = 1)
     }
 }
 
