@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Air
+import androidx.compose.material.icons.rounded.BatteryAlert
+import androidx.compose.material.icons.rounded.BatteryFull
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.WaterDrop
@@ -129,11 +131,15 @@ internal fun ReminderBanner(kind: ReminderKind) {
         ReminderKind.Break -> Icons.Rounded.Visibility to EyeColor
         ReminderKind.Water -> Icons.Rounded.WaterDrop to WaterColor
         ReminderKind.Bedtime -> Icons.Rounded.Bedtime to SleepColor
+        ReminderKind.BatteryLow -> Icons.Rounded.BatteryAlert to Color(0xFFFF3B30)
+        ReminderKind.BatteryFull -> Icons.Rounded.BatteryFull to Color(0xFF34C759)
     }
     val (title, sub) = when (kind) {
         ReminderKind.Break -> "Hora de uma pausa" to "Olhe para algo longe por 20 segundos. Toque quando terminar."
         ReminderKind.Water -> "Beba um copo de água" to "Toque para registrar +1 copo (${Health.water.value}/${s.waterGoal})"
         ReminderKind.Bedtime -> "Faltam 30 min para dormir" to "Que tal ir largando o celular?"
+        ReminderKind.BatteryLow -> "Bateria fraca" to "Restam ${s.lowBatteryLevel}% ou menos. Ligue o carregador ou ative a economia de bateria."
+        ReminderKind.BatteryFull -> "Bateria cheia" to "100%. Já pode tirar o carregador."
     }
     Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(40.dp).clip(CircleShape).background(tint.copy(alpha = 0.18f)), contentAlignment = Alignment.Center) {

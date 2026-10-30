@@ -131,6 +131,7 @@ private enum class Mode(val large: Boolean) {
     Notification(true), Test(true), IncomingCall(true),
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
+    Live(false), AlarmRinging(true), ExpandedLive(true),
 }
 
 @Composable
@@ -143,10 +144,16 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val media by IslandBus.media.collectAsState()
     val notifs by IslandBus.notifications.collectAsState()
     val call by IslandBus.call.collectAsState()
+    val live by IslandBus.live.collectAsState()
+    val cam by IslandBus.cameraInUse.collectAsState()
+    val mic by IslandBus.micInUse.collectAsState()
+    val privacy = s.privacyDot && (cam || mic)
     val screenW by state.screenWidthDp.collectAsState()
 
     val mode = when {
         call?.incoming == true -> Mode.IncomingCall
+        live?.kind == LiveKind.Alarm -> Mode.AlarmRinging
+        expanded && kind == ExpandKind.Live && live != null -> Mode.ExpandedLive
         expanded && call != null -> Mode.ExpandedCall
         expanded && kind == ExpandKind.Activity && media != null -> Mode.ExpandedMedia
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
@@ -163,6 +170,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Test -> Mode.Test
         popup is Popup.Reminder -> Mode.Reminder
         call != null && s.showOngoingCall -> Mode.Call
+        live != null -> Mode.Live
         media != null -> Mode.Media
         asleep -> Mode.Asleep
         else -> Mode.Idle
@@ -182,7 +190,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     )
 
     val wide = if (s.fullWidth) (screenW - 2 * s.sideMargin).dp else minOf(screenW - 16, s.largeMaxWidth).dp
-    val idleHasContent = when (s.idleStyle) {
+    val idleHasContent = privacy || when (s.idleStyle) {
         IdleStyle.Simple -> false
         IdleStyle.AppIcons, IdleStyle.Count -> notifs.isNotEmpty()
         else -> true
@@ -213,6 +221,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedClock -> wide to 132.dp * k * t
         Mode.ExpandedSystem -> wide to 150.dp * k * t
         Mode.Reminder -> wide to 78.dp * k * t
+        Mode.Live -> baseW + grow + (if (live?.kind == LiveKind.Navigation) 64.dp else 28.dp) to baseH
+        Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
+        Mode.ExpandedLive -> wide to (if (live?.actions.isNullOrEmpty()) 92.dp else 132.dp) * k * t
         Mode.ExpandedHealth -> wide to 158.dp * k * t
         Mode.ExpandedBreathe -> wide to 168.dp * k
     }
@@ -223,7 +234,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val r by animateDpAsState(tr, springy, label = "r")
 
     // Segunda ilha (bolinha) com a outra atividade quando há duas ao mesmo tempo.
-    val secondArt = s.dualIsland && mode == Mode.Call && media != null
+    val secondArt = s.dualIsland && (mode == Mode.Call || mode == Mode.Live) && media != null
     val secondNotif = if (s.dualIsland && !secondArt && (mode == Mode.Media || mode == Mode.Call)) notifs.firstOrNull() else null
     val hasSecond = secondArt || secondNotif != null
     val bubble = baseH
@@ -278,7 +289,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                     label = "content",
                 ) { m ->
                     when (m) {
-                        Mode.Idle -> IdleContent(s.idleStyle, notifs, baseH)
+                        Mode.Idle -> IdleContent(s.idleStyle, notifs, baseH, privacy)
                         Mode.Asleep -> Box(Modifier.fillMaxSize())
                         Mode.Media -> media?.let { CompactMedia(it, baseH) }
                         Mode.Call -> call?.let { CompactCall(it, Color(s.callWaveColor)) }
@@ -297,6 +308,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Reminder -> (popup as? Popup.Reminder)?.let { ReminderBanner(it.kind) }
                         Mode.ExpandedHealth -> HealthCard(s)
                         Mode.ExpandedBreathe -> BreatheCard()
+                        Mode.Live -> live?.let { CompactLive(it, baseH) }
+                        Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
+                        Mode.ExpandedLive -> live?.let { ExpandedLive(it) }
                     }
                 }
             }
@@ -364,7 +378,7 @@ private fun Bubble(size: Dp, bg: Color, content: @Composable () -> Unit) {
 
 /** Ilha parada: o meio fica livre para a câmera; o conteúdo vai nas pontas. */
 @Composable
-private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
+private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp, privacy: Boolean) {
     val col = LocalIslandColors.current
     val ic = LocalIconScale.current
     val ctx = LocalContext.current
@@ -409,8 +423,12 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
                 else -> {}
             }
         }
-        // Ponta direita
-        Box {
+        // Ponta direita (com o pontinho de câmera/microfone na frente, se algum app estiver usando)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (privacy) {
+                PrivacyDots()
+                if (style != IdleStyle.Simple) Spacer(Modifier.width(4.dp))
+            }
             when (style) {
                 IdleStyle.AppIcons -> when {
                     apps.size > 2 -> Text("+${apps.size - 1}", color = col.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)

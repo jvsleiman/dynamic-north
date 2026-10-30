@@ -12,6 +12,11 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.hardware.camera2.CameraManager
+import android.media.AudioManager
+import android.media.AudioRecordingConfiguration
+import android.os.Handler
+import android.os.Looper
 import android.hardware.display.DisplayManager
 import android.os.BatteryManager
 import android.os.Build
@@ -35,7 +40,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
-enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe }
+enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe, Live }
 
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
@@ -69,6 +74,7 @@ class IslandService : AccessibilityService() {
                 Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> if (s.chargingEnabled) {
                     show(Popup.Charging(ChargingInfo(batteryLevel(), i.action == Intent.ACTION_POWER_CONNECTED)))
                 }
+                Intent.ACTION_BATTERY_CHANGED -> batteryAlert(i)
                 Intent.ACTION_SCREEN_OFF -> {
                     locked.value = true
                     Health.screenOff()
@@ -113,6 +119,7 @@ class IslandService : AccessibilityService() {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
+            addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction(ACTION_BT_BATTERY)
@@ -120,6 +127,7 @@ class IslandService : AccessibilityService() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
         addOverlay()
         Health.init(this)
+        watchPrivacy()
         if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
         scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
@@ -137,6 +145,14 @@ class IslandService : AccessibilityService() {
             }
         }
         scope.launch { IslandBus.media.collect { scheduleSleep() } }
+        // Timer ou navegação acabou com a ilha aberta nele: recolhe.
+        scope.launch {
+            IslandBus.live.collect { l ->
+                if (l == null && ui.expanded.value && ui.expandKind.value == ExpandKind.Live) ui.expanded.value = false
+                if (l?.kind == LiveKind.Alarm) ui.popup.value = null
+                scheduleSleep()
+            }
+        }
         scope.launch { ui.expanded.collect { scheduleSleep() } }
         scope.launch { ui.asleep.collect { applyVisibility() } }
         // Barrinhas que reagem ao som: o Visualizer só fica ligado enquanto a música toca.
@@ -168,6 +184,7 @@ class IslandService : AccessibilityService() {
         runCatching { unregisterReceiver(receiver) }
         AudioLevels.stop()
         Health.stopSteps()
+        unwatchPrivacy()
         removeOverlay()
         scope.cancel()
         super.onDestroy()
@@ -314,6 +331,66 @@ class IslandService : AccessibilityService() {
         }
     }
 
+    // ---------- bateria fraca / cheia ----------
+
+    private var lowShown = false
+    private var fullShown = false
+
+    private fun batteryAlert(i: Intent) {
+        val s = Prefs.state.value
+        val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100 / i.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+        if (level < 0) return
+        val status = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+        if (charging || level > s.lowBatteryLevel + 5) lowShown = false
+        if (!charging) fullShown = false
+        if (!s.batteryAlerts) return
+        if (!charging && level <= s.lowBatteryLevel && !lowShown) {
+            lowShown = true
+            show(Popup.Reminder(ReminderKind.BatteryLow))
+        } else if (charging && level >= 100 && !fullShown) {
+            fullShown = true
+            show(Popup.Reminder(ReminderKind.BatteryFull))
+        }
+    }
+
+    // ---------- câmera e microfone em uso ----------
+
+    private val busyCams = HashSet<String>()
+    private val camCallback = object : CameraManager.AvailabilityCallback() {
+        override fun onCameraUnavailable(id: String) {
+            busyCams.add(id)
+            IslandBus.cameraInUse.value = true
+        }
+
+        override fun onCameraAvailable(id: String) {
+            busyCams.remove(id)
+            IslandBus.cameraInUse.value = busyCams.isNotEmpty()
+        }
+    }
+    private val micCallback = object : AudioManager.AudioRecordingCallback() {
+        override fun onRecordingConfigChanged(configs: MutableList<AudioRecordingConfiguration>?) {
+            IslandBus.micInUse.value = !configs.isNullOrEmpty()
+        }
+    }
+
+    private fun watchPrivacy() {
+        val main = Handler(Looper.getMainLooper())
+        runCatching { (getSystemService(CAMERA_SERVICE) as CameraManager).registerAvailabilityCallback(camCallback, main) }
+        runCatching {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            am.registerAudioRecordingCallback(micCallback, main)
+            IslandBus.micInUse.value = am.activeRecordingConfigurations.isNotEmpty()
+        }
+    }
+
+    private fun unwatchPrivacy() {
+        runCatching { (getSystemService(CAMERA_SERVICE) as CameraManager).unregisterAvailabilityCallback(camCallback) }
+        runCatching { (getSystemService(AUDIO_SERVICE) as AudioManager).unregisterAudioRecordingCallback(micCallback) }
+        IslandBus.cameraInUse.value = false
+        IslandBus.micInUse.value = false
+    }
+
     /** Lembretes de saúde: pausa para os olhos, beber água e hora de dormir. */
     private suspend fun healthReminders() {
         var lastBreak = 0L
@@ -356,17 +433,19 @@ class IslandService : AccessibilityService() {
         if (secs <= 0) return
         sleepJob = scope.launch {
             delay(secs * 1000L)
-            val busy = ui.popup.value != null || ui.expanded.value || IslandBus.call.value != null || IslandBus.media.value != null
+            val busy = ui.popup.value != null || ui.expanded.value || IslandBus.call.value != null || IslandBus.media.value != null || IslandBus.live.value != null
             if (!busy) ui.asleep.value = true
         }
     }
 
-    private fun canExpand() = IslandBus.call.value != null || IslandBus.media.value != null ||
+    private fun canExpand() = IslandBus.call.value != null || IslandBus.media.value != null || IslandBus.live.value != null ||
         IslandBus.notifications.value.isNotEmpty() || isCharging() || Prefs.state.value.idleStyle != IdleStyle.Simple
 
     /** Abre o layout que corresponde ao que a ilha está mostrando agora. */
     private fun kindForNow(): ExpandKind {
-        if (IslandBus.call.value != null || IslandBus.media.value != null) return ExpandKind.Activity
+        if (IslandBus.call.value != null) return ExpandKind.Activity
+        if (IslandBus.live.value != null) return ExpandKind.Live
+        if (IslandBus.media.value != null) return ExpandKind.Activity
         if (ui.popup.value is Popup.Charging) return ExpandKind.Battery
         return when (Prefs.state.value.idleStyle) {
             IdleStyle.Battery -> ExpandKind.Battery
@@ -395,7 +474,7 @@ class IslandService : AccessibilityService() {
             when (popup.kind) {
                 ReminderKind.Break -> Health.breakTaken()
                 ReminderKind.Water -> Health.addWater(1)
-                ReminderKind.Bedtime -> {}
+                else -> {}
             }
             ui.popup.value = null
             scheduleSleep()
@@ -413,6 +492,12 @@ class IslandService : AccessibilityService() {
                 }
             }
             Gesture.OpenApp -> {
+                val live = IslandBus.live.value
+                if (IslandBus.call.value == null && live?.contentIntent != null && popup == null) {
+                    runCatching { live.contentIntent.send() }
+                    collapse()
+                    return
+                }
                 val pkg = IslandBus.call.value?.pkg
                     ?: (popup as? Popup.Notification)?.item?.pkg
                     ?: IslandBus.media.value?.pkg

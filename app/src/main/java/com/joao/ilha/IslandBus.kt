@@ -52,13 +52,30 @@ data class CallInfo(
     val contentIntent: PendingIntent?,
 )
 
+enum class LiveKind { Timer, Stopwatch, Alarm, Navigation }
+
+/** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
+data class LiveInfo(
+    val key: String,
+    val pkg: String,
+    val kind: LiveKind,
+    val title: String,
+    val text: String,
+    val icon: Bitmap?,
+    /** Base do cronômetro (System.currentTimeMillis); 0 quando o app só manda o texto pronto. */
+    val chronoBase: Long,
+    val countDown: Boolean,
+    val contentIntent: PendingIntent?,
+    val actions: List<NotifAction>,
+)
+
 data class ChargingInfo(val level: Int, val charging: Boolean)
 
 enum class BtKind { Earbuds, Headphones, Watch, Speaker, Other }
 
 data class BluetoothInfo(val name: String, val kind: BtKind, val connected: Boolean, val battery: Int?)
 
-enum class ReminderKind { Break, Water, Bedtime }
+enum class ReminderKind { Break, Water, Bedtime, BatteryLow, BatteryFull }
 
 /** Avisos rápidos que aparecem e somem sozinhos. */
 sealed interface Popup {
@@ -74,6 +91,10 @@ object IslandBus {
     val media = MutableStateFlow<MediaInfo?>(null)
     val notifications = MutableStateFlow<List<NotifItem>>(emptyList())
     val call = MutableStateFlow<CallInfo?>(null)
+    val live = MutableStateFlow<LiveInfo?>(null)
+    /** Algum app usando a câmera / o microfone agora. */
+    val cameraInUse = MutableStateFlow(false)
+    val micInUse = MutableStateFlow(false)
     val listenerConnected = MutableStateFlow(false)
     val serviceRunning = MutableStateFlow(false)
 

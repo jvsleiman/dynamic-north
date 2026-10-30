@@ -20,6 +20,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Bedtime
@@ -92,7 +93,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Display, Customize, Idle, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Display, Customize, Idle, Live, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -136,6 +137,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
         Group("Recursos") {
+            NavRow("Ao vivo na ilha", onOff(s.liveEnabled || s.navEnabled || s.alarmEnabled), Icons.Rounded.Timer, Color(0xFFFF9500)) { go(Screen.Live) }
             NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
             NavRow("Chamada", onOff(s.callEnabled), Icons.Rounded.Call, SwitchGreen) { go(Screen.Calls) }
             NavRow("Reprodutor de música", onOff(s.musicEnabled), Icons.Rounded.MusicNote, Color(0xFFFF2D55)) { go(Screen.Music) }
@@ -651,6 +653,33 @@ private fun WidthGroup(s: Settings) {
             SliderRow("Margem dos lados", s.sideMargin, 0..32, " dp", divider = false) { v -> s.set { copy(sideMargin = v) } }
         } else {
             SliderRow("Largura máxima", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
+        }
+    }
+}
+
+// ---------- ao vivo ----------
+
+@Composable
+fun LiveScreen(back: () -> Unit) {
+    val s by Prefs.state.collectAsState()
+    Page("Ao vivo na ilha", back) {
+        Group(
+            "Atividades",
+            footer = "A ilha lê as notificações do app de relógio e do Maps/Waze. Tocar abre o painel com os botões do app (pausar, parar, sair); segurar abre o app.",
+        ) {
+            SwitchRow("Timer e cronômetro", s.liveEnabled, subtitle = "O tempo conta ao vivo na ilha") { v -> s.set { copy(liveEnabled = v) } }
+            SwitchRow("Alarme tocando", s.alarmEnabled, subtitle = "Ilha grande com soneca e parar") { v -> s.set { copy(alarmEnabled = v) } }
+            SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = false) { v -> s.set { copy(navEnabled = v) } }
+        }
+        Group(footer = "Um pontinho verde aparece quando algum app usa a câmera e laranja quando usa o microfone.") {
+            SwitchRow("Indicador de câmera e microfone", s.privacyDot, divider = false) { v -> s.set { copy(privacyDot = v) } }
+        }
+        Group("Bateria") {
+            SwitchRow("Avisar bateria fraca e cheia", s.batteryAlerts, divider = s.batteryAlerts) { v -> s.set { copy(batteryAlerts = v) } }
+            if (s.batteryAlerts) SliderRow("Bateria fraca em", s.lowBatteryLevel, 5..30, "%", divider = false) { v -> s.set { copy(lowBatteryLevel = v) } }
+        }
+        Group {
+            NavRow("Testar aviso de bateria fraca", divider = false) { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) }
         }
     }
 }

@@ -50,6 +50,7 @@ class NotifListener : NotificationListenerService() {
         controller = null
         IslandBus.media.value = null
         IslandBus.call.value = null
+        IslandBus.live.value = null
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -74,7 +75,7 @@ class NotifListener : NotificationListenerService() {
 
     private fun isRegular(sbn: StatusBarNotification): Boolean {
         val n = sbn.notification
-        if (sbn.packageName == packageName || sbn.isOngoing || isCall(sbn)) return false
+        if (sbn.packageName == packageName || sbn.isOngoing || isCall(sbn) || liveKind(sbn) != null) return false
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return false
         if (n.category == Notification.CATEGORY_TRANSPORT) return false
         return !n.extras.getCharSequence(Notification.EXTRA_TITLE).isNullOrBlank()
@@ -92,6 +93,65 @@ class NotifListener : NotificationListenerService() {
             .filter { isCall(it) }
             .maxByOrNull { it.postTime }
             ?.let { toCall(it) }
+        IslandBus.live.value = list
+            .mapNotNull { sbn -> liveKind(sbn)?.let { sbn to it } }
+            // Alarme tocando tem prioridade; depois navegação; depois timers.
+            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { -it.first.postTime }))
+            .firstOrNull()
+            ?.let { (sbn, kind) -> toLive(sbn, kind) }
+    }
+
+    /** Descobre se a notificação é um timer, cronômetro, alarme tocando ou navegação. */
+    private fun liveKind(sbn: StatusBarNotification): LiveKind? {
+        val s = Prefs.state.value
+        val n = sbn.notification
+        val pkg = sbn.packageName
+        if (pkg == packageName || isCall(sbn) || n.category == Notification.CATEGORY_TRANSPORT) return null
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
+        val clockApp = "clock" in pkg || "alarm" in pkg || pkg == "com.sec.android.app.clockpackage"
+        if (n.category == Notification.CATEGORY_NAVIGATION || pkg in navApps) return if (s.navEnabled && sbn.isOngoing) LiveKind.Navigation else null
+        if (n.category == Notification.CATEGORY_ALARM && (n.fullScreenIntent != null || clockApp && sbn.isOngoing)) {
+            // Lembrete de "próximo alarme" não tem tela cheia e não é contínuo.
+            return if (s.alarmEnabled && n.fullScreenIntent != null) LiveKind.Alarm else null
+        }
+        if (!s.liveEnabled || !sbn.isOngoing) return null
+        val ex = n.extras
+        val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
+        val words = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)} ${n.channelIdSafe()}".lowercase()
+        val isStopwatch = listOf("cronômetro", "cronometro", "stopwatch").any { it in words }
+        val isTimer = listOf("timer", "temporizador").any { it in words }
+        return when {
+            chrono && Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) -> LiveKind.Timer
+            clockApp && isStopwatch -> LiveKind.Stopwatch
+            clockApp && isTimer -> LiveKind.Timer
+            clockApp && chrono -> LiveKind.Stopwatch
+            else -> null
+        }
+    }
+
+    private fun Notification.channelIdSafe(): String = if (Build.VERSION.SDK_INT >= 26) channelId.orEmpty() else ""
+
+    private fun toLive(sbn: StatusBarNotification, kind: LiveKind): LiveInfo {
+        val n = sbn.notification
+        val ex = n.extras
+        val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val text = (ex.getCharSequence(Notification.EXTRA_TEXT) ?: ex.getCharSequence(Notification.EXTRA_SUB_TEXT))?.toString().orEmpty()
+        val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) && n.`when` > 0
+        return LiveInfo(
+            key = sbn.key,
+            pkg = sbn.packageName,
+            kind = kind,
+            title = title,
+            text = text,
+            icon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
+            chronoBase = if (chrono) n.`when` else 0L,
+            countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
+            contentIntent = n.contentIntent,
+            actions = n.actions.orEmpty().mapNotNull { a ->
+                val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                NotifAction(t, a.actionIntent ?: return@mapNotNull null, null)
+            }.take(3),
+        )
     }
 
     private fun toItem(sbn: StatusBarNotification): NotifItem? {
@@ -205,6 +265,8 @@ class NotifListener : NotificationListenerService() {
         )
     }
 }
+
+private val navApps = setOf("com.google.android.apps.maps", "com.waze", "com.here.app.maps", "com.sygic.aura", "ru.yandex.yandexnavi")
 
 fun appLabel(ctx: Context, pkg: String): String = runCatching {
     val pm = ctx.packageManager

@@ -31,6 +31,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Calls -> CallsScreen(back)
                     Screen.Music -> MusicScreen(back, go)
                     Screen.Charging -> ChargingScreen(back)
+                    Screen.Live -> LiveScreen(back)
                     Screen.Bluetooth -> BluetoothScreen(back)
                     Screen.Border -> BorderScreen(back)
                     Screen.Gestures -> GesturesScreen(back)

@@ -116,6 +116,14 @@ data class Settings(
     val swipeChangesTrack: Boolean = true,
     val volumeInPlayer: Boolean = true,
 
+    // Ao vivo
+    val liveEnabled: Boolean = true,
+    val navEnabled: Boolean = true,
+    val alarmEnabled: Boolean = true,
+    val privacyDot: Boolean = true,
+    val batteryAlerts: Boolean = true,
+    val lowBatteryLevel: Int = 15,
+
     // Outros recursos
     val chargingEnabled: Boolean = true,
     val bluetoothEnabled: Boolean = true,
