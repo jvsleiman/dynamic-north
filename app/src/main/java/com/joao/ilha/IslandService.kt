@@ -50,7 +50,14 @@ class IslandUiState {
     val expandKind = MutableStateFlow(ExpandKind.Activity)
     val asleep = MutableStateFlow(false)
     val screenWidthDp = MutableStateFlow(360)
+    /** Deslocamento horizontal da ilha (px) para alinhar com a câmera. */
+    val offsetXPx = MutableStateFlow(0)
+    /** Atividade escolhida como principal ao tocar na bolinha (null = ordem normal). */
+    val focus = MutableStateFlow<Act?>(null)
 }
+
+/** Atividades que podem ocupar a ilha principal ou a bolinha. */
+enum class Act { Call, Live, Media }
 
 /** Serviço de acessibilidade que desenha a ilha por cima de todos os apps. */
 class IslandService : AccessibilityService() {
@@ -60,6 +67,9 @@ class IslandService : AccessibilityService() {
     private var view: ComposeView? = null
     private var owner: OverlayOwner? = null
     private var params: WindowManager.LayoutParams? = null
+    /** Janela invisível só para toques, do tamanho da ilha. A janela desenhada não recebe toques. */
+    private var touch: View? = null
+    private var touchParams: WindowManager.LayoutParams? = null
     private var popupJob: Job? = null
     private var sleepJob: Job? = null
 
@@ -216,23 +226,17 @@ class IslandService : AccessibilityService() {
 
     // ---------- janela ----------
 
+    /**
+     * Duas janelas: uma larga e fixa onde a ilha é desenhada (não muda de tamanho durante a
+     * animação, então nada pula nem pisca) e uma invisível do tamanho da ilha que recebe os
+     * toques e repassa para a primeira. Assim o resto da barra de status continua tocável.
+     */
     @SuppressLint("ClickableViewAccessibility")
     private fun addOverlay() {
         if (view != null) return
-        val p = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            BASE_FLAGS,
-            PixelFormat.TRANSLUCENT,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            if (Build.VERSION.SDK_INT >= 30) {
-                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-            } else if (Build.VERSION.SDK_INT >= 28) {
-                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
+        val d = resources.displayMetrics.density
+        val p = overlayParams(WindowManager.LayoutParams.MATCH_PARENT, visualHeight(), BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+        val tp = overlayParams((120 * d).toInt(), (40 * d).toInt(), BASE_FLAGS or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH)
         val o = OverlayOwner()
         val v = ComposeView(this).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
@@ -248,48 +252,82 @@ class IslandService : AccessibilityService() {
                         onSize = ::setSize,
                         onOpen = ::openPkg,
                         onCollapse = ::collapse,
+                        onBubble = ::bubbleTapped,
                     ),
                 )
             }
-            setOnTouchListener { _, e ->
-                if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) collapse()
-                false
+        }
+        val t = View(this).apply {
+            val a = IntArray(2)
+            val b = IntArray(2)
+            setOnTouchListener { tv, e ->
+                if (e.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+                    collapse()
+                    return@setOnTouchListener false
+                }
+                // Repassa o toque para a ilha desenhada, convertendo as coordenadas.
+                tv.getLocationOnScreen(a)
+                v.getLocationOnScreen(b)
+                val copy = MotionEvent.obtain(e)
+                copy.offsetLocation((a[0] - b[0]).toFloat(), (a[1] - b[1]).toFloat())
+                v.dispatchTouchEvent(copy)
+                copy.recycle()
+                true
             }
         }
         o.attach(v)
         params = p
+        touchParams = tp
         owner = o
         view = v
+        touch = t
         reposition()
-        runCatching { wm.addView(v, p) }.onFailure { view = null; owner = null; o.destroy() }
+        runCatching {
+            wm.addView(v, p)
+            wm.addView(t, tp)
+        }.onFailure { removeOverlay() }
         scheduleSleep()
     }
 
-    /**
-     * Largura da janela em px. Com WRAP_CONTENT o Android limita a janela à largura de um
-     * diálogo (~320 dp), o que impedia a ilha aberta de ocupar a tela toda. A interface só
-     * pede para encolher depois que a animação termina.
-     */
+    private fun overlayParams(w: Int, h: Int, flags: Int) = WindowManager.LayoutParams(
+        w, h, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, flags, PixelFormat.TRANSLUCENT,
+    ).apply {
+        gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        if (Build.VERSION.SDK_INT >= 30) {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        } else if (Build.VERSION.SDK_INT >= 28) {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
+    }
+
+    /** Altura fixa da janela desenhada: cabe a maior ilha aberta. */
+    private fun visualHeight(): Int {
+        val m = resources.displayMetrics
+        return (maxOf(m.heightPixels, m.widthPixels) * 0.6f).toInt()
+    }
+
+    /** Tamanho da área de toque (a ilha e as bolinhas). Mudar não aparece na tela. */
     private fun setSize(wPx: Int, hPx: Int) {
-        val p = params ?: return
+        val p = touchParams ?: return
         if (p.width != wPx || p.height != hPx) {
             p.width = wPx
             p.height = hPx
-            view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
+            touch?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
         }
     }
 
     private fun removeOverlay() {
         view?.let { runCatching { wm.removeViewImmediate(it) } }
+        touch?.let { runCatching { wm.removeViewImmediate(it) } }
         owner?.destroy()
         view = null
+        touch = null
         owner = null
     }
 
     /** Mostra ou esconde sem recriar a janela (apps ocultos, tela de bloqueio, paisagem). */
     private fun applyVisibility() {
         val v = view ?: return
-        val p = params ?: return
         val s = Prefs.state.value
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val hasCall = IslandBus.call.value != null
@@ -299,10 +337,13 @@ class IslandService : AccessibilityService() {
             (foregroundPkg.value !in s.hiddenApps || hasCall)
         val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
         v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
-        val flags = if (visible && !sleepingGone) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        if (p.flags != flags) {
-            p.flags = flags
-            if (v.isAttachedToWindow) runCatching { wm.updateViewLayout(v, p) }
+        val t = touch ?: return
+        val tp = touchParams ?: return
+        val base = BASE_FLAGS or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+        val flags = if (visible && !sleepingGone) base else base or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (tp.flags != flags) {
+            tp.flags = flags
+            if (t.isAttachedToWindow) runCatching { wm.updateViewLayout(t, tp) }
         }
     }
 
@@ -317,10 +358,19 @@ class IslandService : AccessibilityService() {
         val baseX = cam?.let { it.centerX() - screenW / 2 } ?: 0
         val pillH = (s.height * d).toInt()
         val baseY = cam?.let { (it.centerY() - pillH / 2).coerceAtLeast(0) } ?: (8 * d).toInt()
-        p.x = baseX + (s.offsetX * d).toInt()
+        val x = baseX + (s.offsetX * d).toInt()
         // A ilha tem 2 dp de margem em volta (para a borda).
-        p.y = (baseY + (s.offsetY * d).toInt() - (2 * d).toInt()).coerceAtLeast(0)
+        val y = (baseY + (s.offsetY * d).toInt() - (2 * d).toInt()).coerceAtLeast(0)
+        // A janela desenhada ocupa a largura toda; o deslocamento vai para dentro dela.
+        ui.offsetXPx.value = x
+        p.y = y
+        p.height = visualHeight()
         view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
+        touchParams?.let { tp ->
+            tp.x = x
+            tp.y = y
+            touch?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, tp) } }
+        }
     }
 
     private fun cameraRect(): Rect? {
@@ -468,9 +518,7 @@ class IslandService : AccessibilityService() {
 
     /** Abre o layout que corresponde ao que a ilha está mostrando agora. */
     private fun kindForNow(): ExpandKind {
-        if (IslandBus.call.value != null) return ExpandKind.Activity
-        if (IslandBus.live.value != null) return ExpandKind.Live
-        if (IslandBus.media.value != null) return ExpandKind.Activity
+        if (IslandBus.call.value != null || IslandBus.live.value != null || IslandBus.media.value != null) return ExpandKind.Activity
         if (ui.popup.value is Popup.Charging) return ExpandKind.Battery
         return when (Prefs.state.value.idleStyle) {
             IdleStyle.Battery -> ExpandKind.Battery
@@ -572,6 +620,19 @@ class IslandService : AccessibilityService() {
         collapse()
     }
 
+    private fun bubbleTapped(act: Act?) {
+        popupJob?.cancel()
+        ui.popup.value = null
+        if (act != null) {
+            ui.focus.value = act
+            ui.expandKind.value = ExpandKind.Activity
+        } else {
+            ui.expandKind.value = ExpandKind.Notifications
+        }
+        ui.expanded.value = true
+        vibrate()
+    }
+
     private fun collapse() {
         if (ui.expanded.value) ui.expanded.value = false
     }
@@ -628,6 +689,8 @@ class IslandActions(
     val onAction: (NotifItem, NotifAction) -> Unit,
     val onDismiss: (String) -> Unit,
     val onSize: (Int, Int) -> Unit,
+    /** Toque na bolinha: a atividade dela vira a principal (null = notificação). */
+    val onBubble: (Act?) -> Unit,
     val onOpen: (String?) -> Unit,
     val onCollapse: () -> Unit,
 )

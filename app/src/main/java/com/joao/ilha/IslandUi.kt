@@ -87,6 +87,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
@@ -150,13 +152,26 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val mic by IslandBus.micInUse.collectAsState()
     val privacy = s.privacyDot && (cam || mic)
     val screenW by state.screenWidthDp.collectAsState()
+    val offsetX by state.offsetXPx.collectAsState()
+    val focus by state.focus.collectAsState()
+
+    // Atividades ao mesmo tempo: a principal fica na ilha e a outra na bolinha.
+    // Tocar na bolinha troca as duas (focus).
+    val acts = buildList {
+        if (call != null && s.showOngoingCall) add(Act.Call)
+        if (live != null) add(Act.Live)
+        if (media != null) add(Act.Media)
+    }
+    val main = focus?.takeIf { it in acts } ?: acts.firstOrNull()
+    val second = if (s.dualIsland) acts.firstOrNull { it != main } else null
 
     val mode = when {
         call?.incoming == true -> Mode.IncomingCall
         live?.kind == LiveKind.Alarm -> Mode.AlarmRinging
-        expanded && kind == ExpandKind.Live && live != null -> Mode.ExpandedLive
-        expanded && call != null -> Mode.ExpandedCall
-        expanded && kind == ExpandKind.Activity && media != null -> Mode.ExpandedMedia
+        expanded && kind == ExpandKind.Activity && main == Act.Call -> Mode.ExpandedCall
+        expanded && kind == ExpandKind.Activity && main == Act.Live -> Mode.ExpandedLive
+        expanded && kind == ExpandKind.Activity && main == Act.Media -> Mode.ExpandedMedia
+        expanded && call != null && kind == ExpandKind.Activity -> Mode.ExpandedCall
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
         expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
@@ -170,9 +185,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Bluetooth -> Mode.Bluetooth
         popup is Popup.Test -> Mode.Test
         popup is Popup.Reminder -> Mode.Reminder
-        call != null && s.showOngoingCall -> Mode.Call
-        live != null -> Mode.Live
-        media != null -> Mode.Media
+        main == Act.Call -> Mode.Call
+        main == Act.Live -> Mode.Live
+        main == Act.Media -> Mode.Media
         asleep -> Mode.Asleep
         else -> Mode.Idle
     }
@@ -235,46 +250,47 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val h by animateDpAsState(th, springy, label = "h")
     val r by animateDpAsState(tr, springy, label = "r")
 
-    // Segunda ilha (bolinha) com a outra atividade quando há duas ao mesmo tempo.
-    val secondArt = s.dualIsland && (mode == Mode.Call || mode == Mode.Live) && media != null
-    val secondNotif = if (s.dualIsland && !secondArt && (mode == Mode.Media || mode == Mode.Call)) notifs.firstOrNull() else null
-    val hasSecond = secondArt || secondNotif != null
-    val bubble = baseH
-    val bubbleContent: @Composable () -> Unit = {
-        if (secondArt) Art(media?.art?.asImageBitmap(), baseH - 8.dp, CircleShape)
-        else secondNotif?.let { NotifPicture(it, baseH - 8.dp) }
-    }
-
-    val density = LocalDensity.current
-    // A janela precisa da largura total (ilha + bolinha dos dois lados).
-    // Folga de 24 dp para a mola passar um pouco do tamanho final sem ser cortada.
-    // Folga para a mola passar um pouco do tamanho final sem ser cortada (mais na "Saltitante").
-    val slack = if (s.motion.damping < 0.7f) 64.dp else 28.dp
-    val totalW = tw + slack + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
-    val totalH = th + 4.dp + slack
-    val targetW = with(density) { totalW.roundToPx() }
-    val targetH = with(density) { totalH.roundToPx() }
-    // A janela cresce na hora e só encolhe quando a animação terminou. Assim o Android não precisa
-    // redimensionar a janela a cada quadro (era isso que dava a "bugadinha" ao abrir e fechar).
-    val settled = abs((w - tw).value) < 0.5f && abs((h - th).value) < 0.5f
-    var reportedW by remember { mutableIntStateOf(0) }
-    var reportedH by remember { mutableIntStateOf(0) }
-    LaunchedEffect(targetW, targetH, settled) {
-        if (targetW > reportedW || targetH > reportedH || settled) {
-            reportedW = if (settled) targetW else maxOf(targetW, reportedW)
-            reportedH = if (settled) targetH else maxOf(targetH, reportedH)
-            actions.onSize(reportedW, reportedH)
+    // Segunda ilha (bolinha): a outra atividade, ou a última notificação por alguns segundos.
+    val compactMain = mode == Mode.Call || mode == Mode.Live || mode == Mode.Media
+    val newestNotif = notifs.firstOrNull()
+    var notifBubbleKey by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(newestNotif?.key, newestNotif?.postedAt) {
+        notifBubbleKey = newestNotif?.key
+        if (newestNotif != null) {
+            delay(8_000)
+            notifBubbleKey = null
         }
     }
+    val bubbleAct = if (compactMain) second else null
+    val secondNotif = if (s.dualIsland && compactMain && bubbleAct == null) newestNotif?.takeIf { it.key == notifBubbleKey } else null
+    val hasSecond = bubbleAct != null || secondNotif != null
+    val bubble = baseH
+    val bubbleContent: @Composable () -> Unit = {
+        when (bubbleAct) {
+            Act.Media -> Art(media?.art?.asImageBitmap(), baseH - 8.dp, CircleShape)
+            Act.Call -> Icon(Icons.Rounded.Call, null, tint = Green, modifier = Modifier.size(baseH * 0.5f))
+            Act.Live -> live?.let { CompactLiveIcon(it, baseH * 0.55f) }
+            null -> secondNotif?.let { NotifPicture(it, baseH - 8.dp) }
+        }
+    }
+    val onBubble = { actions.onBubble(bubbleAct) }
+
+    val density = LocalDensity.current
+    // Área de toque = ilha + bolinhas. A janela desenhada é fixa, então isso não aparece na tela.
+    val touchW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
+    val touchH = th + 4.dp
+    val targetW = with(density) { touchW.roundToPx() }
+    val targetH = with(density) { touchH.roundToPx() }
+    LaunchedEffect(targetW, targetH) { actions.onSize(targetW, targetH) }
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
-        // A janela pode ficar mais larga que a ilha (enquanto encolhe): mantém centralizada.
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        // A janela desenhada ocupa a largura toda; a ilha fica no centro (ou alinhada à câmera).
+        Box(Modifier.fillMaxWidth().offset { IntOffset(offsetX, 0) }, contentAlignment = Alignment.TopCenter) {
         Row(verticalAlignment = Alignment.Top) {
             // Espaço igual do outro lado para a ilha principal continuar centralizada.
             if (hasSecond && s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
             if (hasSecond && !s.dualOnRight) {
-                Bubble(bubble, colors.bg, bubbleContent)
+                Bubble(bubble, colors.bg, onBubble, bubbleContent)
                 Spacer(Modifier.width(6.dp))
             }
             Island(
@@ -295,13 +311,20 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                 AnimatedContent(
                     targetState = mode,
                     // Sem animação de tamanho própria: quem anima o tamanho é a ilha (senão as duas brigam).
-                    transitionSpec = { (fadeIn(tween(200, 70)) togetherWith fadeOut(tween(80))).using(null) },
+                    // Ao fechar, o conteúdo grande some devagar enquanto a ilha encolhe (sem quadro preto vazio).
+                    transitionSpec = {
+                        val closing = initialState.large && !targetState.large
+                        val spec = if (closing) fadeIn(tween(160, 140)) togetherWith fadeOut(tween(220))
+                        else fadeIn(tween(200, 70)) togetherWith fadeOut(tween(80))
+                        spec.using(null)
+                    },
                     modifier = Modifier.fillMaxSize(),
                     label = "content",
                 ) { m ->
                     // O conteúdo já nasce no tamanho final e a ilha vai revelando (nada fica espremido).
+                    // Se a mola passar do tamanho final, o conteúdo acompanha (sem faixa preta na borda).
                     val (cw, ch) = sizeFor(m)
-                    Box(Modifier.requiredSize(cw, ch)) {
+                    Box(Modifier.requiredSize(if (m == mode) maxOf(cw, w) else cw, if (m == mode) maxOf(ch, h) else ch)) {
                     when (m) {
                         Mode.Idle -> IdleContent(s.idleStyle, notifs, baseH, privacy)
                         Mode.Asleep -> Box(Modifier.fillMaxSize())
@@ -331,7 +354,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
             }
             if (hasSecond && s.dualOnRight) {
                 Spacer(Modifier.width(6.dp))
-                Bubble(bubble, colors.bg, bubbleContent)
+                Bubble(bubble, colors.bg, onBubble, bubbleContent)
             }
             if (hasSecond && !s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
         }
@@ -382,9 +405,10 @@ private fun Modifier.animatedBorder(s: Settings): Modifier {
 }
 
 @Composable
-private fun Bubble(size: Dp, bg: Color, content: @Composable () -> Unit) {
+private fun Bubble(size: Dp, bg: Color, onTap: () -> Unit, content: @Composable () -> Unit) {
     Box(
-        Modifier.padding(top = 2.dp).size(size).clip(CircleShape).background(bg),
+        Modifier.padding(top = 2.dp).size(size).clip(CircleShape).background(bg)
+            .pointerInput(onTap) { detectTapGestures { onTap() } },
         contentAlignment = Alignment.Center,
     ) { content() }
 }
@@ -749,8 +773,11 @@ private fun ExpandedMedia(m: MediaInfo, s: Settings, actions: IslandActions) {
         if (s.blurArt && art != null) {
             Image(
                 art, null, contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().alpha(if (Build.VERSION.SDK_INT >= 31) 0.55f else 0.25f)
-                    .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(28.dp) else Modifier),
+                // Ampliada e com borda "solta": o desfoque não escurece as beiradas (era a borda preta).
+                modifier = Modifier.fillMaxSize()
+                    .graphicsLayer { scaleX = 1.3f; scaleY = 1.3f }
+                    .alpha(if (Build.VERSION.SDK_INT >= 31) 0.55f else 0.25f)
+                    .then(if (Build.VERSION.SDK_INT >= 31) Modifier.blur(28.dp, BlurredEdgeTreatment.Unbounded) else Modifier),
             )
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         }

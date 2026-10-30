@@ -88,6 +88,9 @@ private fun LiveIcon(l: LiveInfo, size: Dp) {
     }
 }
 
+@Composable
+internal fun CompactLiveIcon(l: LiveInfo, size: Dp) = LiveIcon(l, size)
+
 // ---------- ilha pequena ----------
 
 @Composable
