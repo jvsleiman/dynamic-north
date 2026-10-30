@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 
 private val Card = Color(0xFF1A1A1F)
 private val Accent = Color(0xFF7CF5B0)
@@ -148,6 +149,8 @@ private fun Home() {
             OutlinedButton(onClick = { Prefs.reset() }) { Text("Restaurar padrão") }
         }
 
+        UpdateSection()
+
         Button(
             onClick = { IslandBus.show(Popup.Test) },
             enabled = a11y,
@@ -155,6 +158,60 @@ private fun Home() {
             colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.Black),
         ) { Text("Testar a ilha") }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+private sealed interface UpdateStatus {
+    data object Idle : UpdateStatus
+    data object Checking : UpdateStatus
+    data object UpToDate : UpdateStatus
+    data class Available(val r: Updater.Release) : UpdateStatus
+    data class Downloading(val p: Float) : UpdateStatus
+    data class Failed(val msg: String) : UpdateStatus
+}
+
+@Composable
+private fun UpdateSection() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val (code, name) = remember { Updater.currentVersion(ctx) }
+    var status by remember { mutableStateOf<UpdateStatus>(UpdateStatus.Idle) }
+
+    fun check() {
+        status = UpdateStatus.Checking
+        scope.launch {
+            status = runCatching { Updater.latest() }.fold(
+                onSuccess = { if (it.versionCode > code) UpdateStatus.Available(it) else UpdateStatus.UpToDate },
+                onFailure = { UpdateStatus.Failed("Não consegui verificar (sem internet?)") },
+            )
+        }
+    }
+    androidx.compose.runtime.LaunchedEffect(Unit) { check() }
+
+    Section("Atualização") {
+        Text("Versão instalada: $name", color = Color.White, fontSize = 15.sp)
+        when (val st = status) {
+            UpdateStatus.Idle, UpdateStatus.Checking -> Text("Verificando…", color = Dim, fontSize = 13.sp)
+            UpdateStatus.UpToDate -> Text("Você está na versão mais nova.", color = Accent, fontSize = 13.sp)
+            is UpdateStatus.Failed -> Text(st.msg, color = Dim, fontSize = 13.sp)
+            is UpdateStatus.Downloading -> Text("Baixando… ${(st.p * 100).toInt()}%", color = Dim, fontSize = 13.sp)
+            is UpdateStatus.Available -> {
+                Text("Nova versão ${st.r.versionName} disponível", color = Accent, fontSize = 13.sp)
+                if (st.r.notes.isNotBlank()) Text(st.r.notes, color = Dim, fontSize = 12.sp)
+                Button(onClick = {
+                    scope.launch {
+                        runCatching {
+                            val f = Updater.download(ctx, st.r) { p -> status = UpdateStatus.Downloading(p) }
+                            Updater.install(ctx, f)
+                            status = UpdateStatus.Available(st.r)
+                        }.onFailure { status = UpdateStatus.Failed("O download falhou. Tente de novo.") }
+                    }
+                }) { Text("Baixar e instalar") }
+            }
+        }
+        if (status !is UpdateStatus.Available && status !is UpdateStatus.Downloading) {
+            OutlinedButton(onClick = { check() }) { Text("Verificar atualizações") }
+        }
     }
 }
 
