@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [claude/project-thread-nzugwz]
-    paths: [.github/workflows/analise.yml]
+    paths: [.github/workflows/analise.yml, ANALISAR]
 
 permissions:
   contents: write
