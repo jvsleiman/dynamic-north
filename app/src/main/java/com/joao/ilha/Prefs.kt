@@ -38,6 +38,12 @@ enum class IdleStyle(val label: String) {
     Alarm("Próximo alarme"),
     Greeting("Saudação"),
     Pulse("Luz pulsando"),
+    Health("Saúde (passos e água)"),
+    Steps("Passos do dia"),
+    Water("Copos de água"),
+    ScreenBreak("Pausa para os olhos"),
+    Breathing("Respiração guiada"),
+    Bedtime("Hora de dormir"),
 }
 
 enum class AppTheme(val label: String) { System("Automático (sistema)"), Light("Claro"), Dark("Escuro") }
@@ -68,6 +74,14 @@ data class Settings(
     val borderLarge: Boolean = false,
     val borderColor: Long = 0xFF3A3A3C,
     val motion: Motion = Motion.Liquid,
+
+    // Saúde
+    val stepGoal: Int = 8000,
+    val waterGoal: Int = 8,
+    val bedtime: Int = 23 * 60,
+    val breakMinutes: Int = 20,
+    val breakReminder: Boolean = true,
+    val waterReminder: Boolean = false,
 
     // Personalizar layouts
     val textScale: Int = 100,

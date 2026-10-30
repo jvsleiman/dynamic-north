@@ -20,6 +20,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
+import androidx.compose.material.icons.rounded.Air
+import androidx.compose.material.icons.rounded.Bedtime
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapVert
@@ -659,6 +664,20 @@ fun IdleScreen(back: () -> Unit) {
     val styles = IdleStyle.entries
     val pager = rememberPagerState(initialPage = styles.indexOf(s.idleStyle).coerceAtLeast(0)) { styles.size }
     val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+    // Passos precisam da permissão de "atividade física" (Android 10+).
+    var pendingStyle by remember { mutableStateOf<IdleStyle?>(null) }
+    val askSteps = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        pendingStyle?.let { st -> s.set { copy(idleStyle = st) } }
+        Health.startSteps(ctx)
+    }
+    val pick: (IdleStyle) -> Unit = { st ->
+        val needsSteps = st == IdleStyle.Steps || st == IdleStyle.Health
+        if (needsSteps && !Health.hasStepPermission(ctx)) {
+            pendingStyle = st
+            askSteps.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        } else s.set { copy(idleStyle = st) }
+    }
     Page("Ilha parada", back) {
         Text(
             "Deslize para ver os estilos e toque no card para usar. Tocar na ilha abre o layout do estilo.",
@@ -690,7 +709,7 @@ fun IdleScreen(back: () -> Unit) {
                     Modifier.graphicsLayer { scaleX = scale; scaleY = scale; alpha = 1f - 0.35f * offset },
                 ) {
                     if (pager.currentPage != page) scope.launch { pager.animateScrollToPage(page) }
-                    else s.set { copy(idleStyle = style) }
+                    else pick(style)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -708,6 +727,27 @@ fun IdleScreen(back: () -> Unit) {
             NavRow("Usando agora", s.idleStyle.label) { scope.launch { pager.animateScrollToPage(styles.indexOf(s.idleStyle)) } }
             NavRow("Testar", divider = false) { IslandBus.show(Popup.Test) }
         }
+        HealthGroup(s)
+    }
+}
+
+@Composable
+private fun HealthGroup(s: Settings) {
+    Group(
+        "Saúde",
+        footer = "Os passos vêm do sensor do celular e a água você marca tocando na ilha aberta. Tudo fica só no aparelho e zera à meia-noite.",
+    ) {
+        SliderRow("Meta de passos", s.stepGoal / 500, 4..30, format = { formatSteps(it * 500) }) { v -> s.set { copy(stepGoal = v * 500) } }
+        SliderRow("Meta de água", s.waterGoal, 4..16, " copos") { v -> s.set { copy(waterGoal = v) } }
+        // De 20:00 a 02:00, de meia em meia hora.
+        val bedIdx = ((s.bedtime - 20 * 60 + 24 * 60) % (24 * 60)) / 30
+        SliderRow("Hora de dormir", bedIdx.coerceIn(0, 12), 0..12, format = { i ->
+            val m = (20 * 60 + i * 30) % (24 * 60)
+            "%02d:%02d".format(m / 60, m % 60)
+        }) { i -> s.set { copy(bedtime = (20 * 60 + i * 30) % (24 * 60)) } }
+        SwitchRow("Lembrar de fazer pausas", s.breakReminder, subtitle = "Avisa depois de muito tempo seguido na tela") { v -> s.set { copy(breakReminder = v) } }
+        if (s.breakReminder) SliderRow("Pausa a cada", s.breakMinutes, 10..90, " min") { v -> s.set { copy(breakMinutes = v) } }
+        SwitchRow("Lembrar de beber água", s.waterReminder, subtitle = "A cada 1 h 30 até bater a meta", divider = false) { v -> s.set { copy(waterReminder = v) } }
     }
 }
 
@@ -725,6 +765,12 @@ private val idleHints = mapOf(
     IdleStyle.Alarm to "Abre o relógio",
     IdleStyle.Greeting to "Abre o relógio",
     IdleStyle.Pulse to "Uma luz verde respirando",
+    IdleStyle.Health to "Abre o painel de saúde",
+    IdleStyle.Steps to "Abre o painel de saúde",
+    IdleStyle.Water to "Toque na ilha aberta: +1 copo",
+    IdleStyle.ScreenBreak to "Avisa a hora de descansar",
+    IdleStyle.Breathing to "Abre a respiração guiada",
+    IdleStyle.Bedtime to "Quanto falta para dormir",
 )
 
 /** Card claro como na referência: área de imagem com a ilha de exemplo, título e descrição. */
@@ -783,6 +829,15 @@ private fun IdlePill(style: IdleStyle, modifier: Modifier) {
             IdleStyle.Alarm -> { icon(Icons.Rounded.Alarm, Color(0xFFFF9F0A)); txt("sex 04:00") }
             IdleStyle.Greeting -> { Text("🌙", fontSize = 11.sp); txt("Boa noite") }
             IdleStyle.Pulse -> { Spacer(Modifier.width(1.dp)); Box(Modifier.size(9.dp).clip(CircleShape).background(SwitchGreen)) }
+            IdleStyle.Health -> {
+                Ring(0.62f, StepColor, 20.dp, 2.dp) { Icon(Icons.AutoMirrored.Rounded.DirectionsWalk, null, tint = StepColor, modifier = Modifier.size(11.dp)) }
+                Row(verticalAlignment = Alignment.CenterVertically) { icon(Icons.Rounded.WaterDrop, WaterColor); txt("5") }
+            }
+            IdleStyle.Steps -> { icon(Icons.AutoMirrored.Rounded.DirectionsWalk, StepColor); txt("4.230") }
+            IdleStyle.Water -> { icon(Icons.Rounded.WaterDrop, WaterColor); txt("5/8") }
+            IdleStyle.ScreenBreak -> { icon(Icons.Rounded.Visibility, EyeColor); txt("18 min") }
+            IdleStyle.Breathing -> { icon(Icons.Rounded.Air, BreathColor); Box(Modifier.size(11.dp).clip(CircleShape).background(BreathColor)) }
+            IdleStyle.Bedtime -> { icon(Icons.Rounded.Bedtime, SleepColor); txt("2 h 10") }
         }
     }
 }

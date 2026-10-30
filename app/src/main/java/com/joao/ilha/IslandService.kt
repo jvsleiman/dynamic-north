@@ -35,7 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
-enum class ExpandKind { Activity, Battery, Clock, Notifications, System }
+enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe }
 
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
@@ -69,9 +69,18 @@ class IslandService : AccessibilityService() {
                 Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> if (s.chargingEnabled) {
                     show(Popup.Charging(ChargingInfo(batteryLevel(), i.action == Intent.ACTION_POWER_CONNECTED)))
                 }
-                Intent.ACTION_SCREEN_OFF -> locked.value = true
-                Intent.ACTION_SCREEN_ON -> locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
-                Intent.ACTION_USER_PRESENT -> locked.value = false
+                Intent.ACTION_SCREEN_OFF -> {
+                    locked.value = true
+                    Health.screenOff()
+                }
+                Intent.ACTION_SCREEN_ON -> {
+                    locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+                    if (!locked.value) Health.screenOn()
+                }
+                Intent.ACTION_USER_PRESENT -> {
+                    locked.value = false
+                    Health.screenOn()
+                }
                 BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (s.bluetoothEnabled) {
                     val d = device(i) ?: return
                     val info = BluetoothInfo(deviceName(d), deviceKind(d), i.action == BluetoothDevice.ACTION_ACL_CONNECTED, null)
@@ -110,8 +119,11 @@ class IslandService : AccessibilityService() {
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
         addOverlay()
+        Health.init(this)
+        if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
-        scope.launch { Prefs.state.collect { reposition(); applyVisibility() } }
+        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
+        scope.launch { healthReminders() }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
         scope.launch {
@@ -155,6 +167,7 @@ class IslandService : AccessibilityService() {
         IslandBus.serviceRunning.value = false
         runCatching { unregisterReceiver(receiver) }
         AudioLevels.stop()
+        Health.stopSteps()
         removeOverlay()
         scope.cancel()
         super.onDestroy()
@@ -301,6 +314,34 @@ class IslandService : AccessibilityService() {
         }
     }
 
+    /** Lembretes de saúde: pausa para os olhos, beber água e hora de dormir. */
+    private suspend fun healthReminders() {
+        var lastBreak = 0L
+        var lastWater = System.currentTimeMillis()
+        var bedDay = -1
+        while (true) {
+            delay(30_000)
+            val s = Prefs.state.value
+            val now = System.currentTimeMillis()
+            val busy = IslandBus.call.value != null || ui.expanded.value || ui.popup.value != null
+            if (busy || locked.value) continue
+            val using = Health.minutesUsing(now)
+            if (s.breakReminder && using >= s.breakMinutes && now - lastBreak > s.breakMinutes * 60_000L) {
+                lastBreak = now
+                show(Popup.Reminder(ReminderKind.Break))
+            } else if (s.waterReminder && Health.water.value < s.waterGoal && now - lastWater > 90 * 60_000L) {
+                lastWater = now
+                show(Popup.Reminder(ReminderKind.Water))
+            } else if (s.idleStyle == IdleStyle.Bedtime && Health.minutesToBed(s.bedtime) == 30) {
+                val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
+                if (day != bedDay) {
+                    bedDay = day
+                    show(Popup.Reminder(ReminderKind.Bedtime))
+                }
+            }
+        }
+    }
+
     private fun vibrate() {
         if (!Prefs.state.value.vibrate) return
         val c = if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
@@ -332,6 +373,8 @@ class IslandService : AccessibilityService() {
             IdleStyle.Clock, IdleStyle.Date, IdleStyle.ClockBattery, IdleStyle.Alarm, IdleStyle.Greeting -> ExpandKind.Clock
             IdleStyle.NetSpeed, IdleStyle.Memory, IdleStyle.Storage -> ExpandKind.System
             IdleStyle.AppIcons, IdleStyle.Count -> ExpandKind.Notifications
+            IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Bedtime -> ExpandKind.Health
+            IdleStyle.Breathing -> ExpandKind.Breathe
             IdleStyle.Simple, IdleStyle.Pulse -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Battery else ExpandKind.Notifications
         }
     }
@@ -345,6 +388,17 @@ class IslandService : AccessibilityService() {
         if (tap && popup is Popup.Notification) {
             runCatching { popup.item.contentIntent?.send() }
             ui.popup.value = null
+            return
+        }
+        // Tocar no lembrete já registra: pausa feita ou um copo de água.
+        if (tap && popup is Popup.Reminder) {
+            when (popup.kind) {
+                ReminderKind.Break -> Health.breakTaken()
+                ReminderKind.Water -> Health.addWater(1)
+                ReminderKind.Bedtime -> {}
+            }
+            ui.popup.value = null
+            scheduleSleep()
             return
         }
         when (g) {

@@ -11,6 +11,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!-- Barrinhas que reagem ao som: o Visualizer do Android exige essas permissões (nada é gravado). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Lista de apps para bloquear ou esconder a ilha. -->

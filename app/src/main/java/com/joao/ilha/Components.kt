@@ -1,5 +1,6 @@
 package com.joao.ilha
 
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -185,16 +186,16 @@ fun SwitchRow(title: String, checked: Boolean, subtitle: String? = null, icon: I
 }
 
 @Composable
-fun SliderRow(title: String, value: Int, range: IntRange, unit: String = "", divider: Boolean = true, onChange: (Int) -> Unit) {
+fun SliderRow(title: String, value: Int, range: IntRange, unit: String = "", divider: Boolean = true, format: ((Int) -> String)? = null, onChange: (Int) -> Unit) {
     val p = LocalPalette.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row {
             Text(title, color = p.text, fontSize = 17.sp, modifier = Modifier.weight(1f))
-            Text("$value$unit", color = p.secondary, fontSize = 15.sp)
+            Text(format?.invoke(value) ?: "$value$unit", color = p.secondary, fontSize = 15.sp)
         }
         Slider(
             value = value.toFloat(),
-            onValueChange = { onChange(it.toInt()) },
+            onValueChange = { onChange(it.roundToInt()) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Accent, inactiveTrackColor = p.separator),
         )

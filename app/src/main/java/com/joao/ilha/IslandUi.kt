@@ -119,17 +119,18 @@ private val ListRow = 56.dp
 private val Red = Color(0xFFFF3B30)
 
 /** Cores da ilha (fundo e texto), escolhidas nos ajustes ou tiradas da capa/ícone. */
-private data class IslandColors(val bg: Color, val text: Color, val dim: Color)
+internal data class IslandColors(val bg: Color, val text: Color, val dim: Color)
 
 /** Escala dos ícones e fotos escolhida em Personalizar. */
-private val LocalIconScale = compositionLocalOf { 1f }
+internal val LocalIconScale = compositionLocalOf { 1f }
 
-private val LocalIslandColors = compositionLocalOf { IslandColors(Color.Black, Color.White, Color(0xFFB4B4BC)) }
+internal val LocalIslandColors = compositionLocalOf { IslandColors(Color.Black, Color.White, Color(0xFFB4B4BC)) }
 
 private enum class Mode(val large: Boolean) {
     Idle(false), Asleep(false), Media(false), Call(false), Charging(false), Bluetooth(false), SmallNotif(false),
     Notification(true), Test(true), IncomingCall(true),
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
+    Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
 }
 
 @Composable
@@ -151,6 +152,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
         expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
+        expanded && kind == ExpandKind.Health -> Mode.ExpandedHealth
+        expanded && kind == ExpandKind.Breathe -> Mode.ExpandedBreathe
         expanded && notifs.isNotEmpty() -> Mode.ExpandedList
         expanded && media != null -> Mode.ExpandedMedia
         expanded -> Mode.ExpandedBattery
@@ -158,6 +161,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Charging -> Mode.Charging
         popup is Popup.Bluetooth -> Mode.Bluetooth
         popup is Popup.Test -> Mode.Test
+        popup is Popup.Reminder -> Mode.Reminder
         call != null && s.showOngoingCall -> Mode.Call
         media != null -> Mode.Media
         asleep -> Mode.Asleep
@@ -208,6 +212,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedBattery -> wide to 112.dp * k
         Mode.ExpandedClock -> wide to 132.dp * k * t
         Mode.ExpandedSystem -> wide to 150.dp * k * t
+        Mode.Reminder -> wide to 78.dp * k * t
+        Mode.ExpandedHealth -> wide to 158.dp * k * t
+        Mode.ExpandedBreathe -> wide to 168.dp * k
     }
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
@@ -287,6 +294,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.ExpandedBattery -> BatteryCard()
                         Mode.ExpandedClock -> ClockCard()
                         Mode.ExpandedSystem -> SystemCard()
+                        Mode.Reminder -> (popup as? Popup.Reminder)?.let { ReminderBanner(it.kind) }
+                        Mode.ExpandedHealth -> HealthCard(s)
+                        Mode.ExpandedBreathe -> BreatheCard()
                     }
                 }
             }
@@ -394,6 +404,8 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
                 IdleStyle.Storage -> Icon(Icons.Rounded.Storage, null, tint = Color(0xFFFF9F0A), modifier = Modifier.size((h - 18.dp) * ic))
                 IdleStyle.Alarm -> Icon(Icons.Rounded.Alarm, null, tint = Color(0xFFFF9F0A), modifier = Modifier.size((h - 18.dp) * ic))
                 IdleStyle.Greeting -> Text(greetingEmoji(now), fontSize = 12.sp)
+                IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Breathing, IdleStyle.Bedtime ->
+                    HealthIdleLeft(style, (h - 18.dp) * ic)
                 else -> {}
             }
         }
@@ -412,6 +424,8 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp) {
                 IdleStyle.Alarm -> Text(remember(now) { SystemInfo.nextAlarm(ctx) ?: "—" }, color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 IdleStyle.Greeting -> Text(greeting(now), color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 IdleStyle.Pulse -> PulseDot()
+                IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Breathing, IdleStyle.Bedtime ->
+                    HealthIdleRight(style, now, h)
                 else -> {}
             }
         }

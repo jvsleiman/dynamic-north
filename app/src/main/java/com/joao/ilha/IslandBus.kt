@@ -58,12 +58,15 @@ enum class BtKind { Earbuds, Headphones, Watch, Speaker, Other }
 
 data class BluetoothInfo(val name: String, val kind: BtKind, val connected: Boolean, val battery: Int?)
 
+enum class ReminderKind { Break, Water, Bedtime }
+
 /** Avisos rápidos que aparecem e somem sozinhos. */
 sealed interface Popup {
     data class Notification(val item: NotifItem) : Popup
     data class Charging(val info: ChargingInfo) : Popup
     data class Bluetooth(val info: BluetoothInfo) : Popup
     data object Test : Popup
+    data class Reminder(val kind: ReminderKind) : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */
