@@ -18,6 +18,7 @@ data class NotifItem(
     val largeIcon: Bitmap?,
     val contentIntent: PendingIntent?,
     val postedAt: Long,
+    val clearable: Boolean,
 )
 
 data class MediaInfo(
@@ -33,21 +34,47 @@ data class MediaInfo(
     val controller: MediaController,
 )
 
+/** Chamada lida da notificação do app de telefone (ou de VoIP). */
+data class CallInfo(
+    val key: String,
+    val pkg: String,
+    val name: String,
+    val photo: Bitmap?,
+    val incoming: Boolean,
+    /** Início da chamada (System.currentTimeMillis), quando em andamento. */
+    val startedAt: Long,
+    val answer: PendingIntent?,
+    val decline: PendingIntent?,
+    val contentIntent: PendingIntent?,
+)
+
 data class ChargingInfo(val level: Int, val charging: Boolean)
 
-/** Eventos que aparecem rapidamente na ilha e depois somem. */
+enum class BtKind { Earbuds, Headphones, Watch, Speaker, Other }
+
+data class BluetoothInfo(val name: String, val kind: BtKind, val connected: Boolean, val battery: Int?)
+
+/** Avisos rápidos que aparecem e somem sozinhos. */
 sealed interface Popup {
     data class Notification(val item: NotifItem) : Popup
     data class Charging(val info: ChargingInfo) : Popup
+    data class Bluetooth(val info: BluetoothInfo) : Popup
     data object Test : Popup
 }
 
-/** Liga o leitor de notificações ao serviço que desenha a ilha (mesmo processo). */
+/** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */
 object IslandBus {
     val media = MutableStateFlow<MediaInfo?>(null)
     val notifications = MutableStateFlow<List<NotifItem>>(emptyList())
+    val call = MutableStateFlow<CallInfo?>(null)
     val listenerConnected = MutableStateFlow(false)
     val serviceRunning = MutableStateFlow(false)
+
+    /** Ações que precisam do leitor de notificações (remover uma ou todas). */
+    @Volatile var dismiss: ((String?) -> Unit)? = null
+
+    /** Relê notificações e player depois de mudar um ajuste (apps bloqueados etc.). */
+    @Volatile var refresh: (() -> Unit)? = null
 
     private val _popups = MutableSharedFlow<Popup>(extraBufferCapacity = 8)
     val popups = _popups.asSharedFlow()

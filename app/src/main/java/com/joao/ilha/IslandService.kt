@@ -2,6 +2,9 @@ package com.joao.ilha
 
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
+import android.bluetooth.BluetoothClass
+import android.bluetooth.BluetoothDevice
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,6 +19,7 @@ import android.view.Display
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import androidx.compose.ui.platform.ComposeView
@@ -27,7 +31,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+
+/** Estado da ilha que a interface desenha. */
+class IslandUiState {
+    val popup = MutableStateFlow<Popup?>(null)
+    val expanded = MutableStateFlow(false)
+    val asleep = MutableStateFlow(false)
+    val screenWidthDp = MutableStateFlow(360)
+}
 
 /** Serviço de acessibilidade que desenha a ilha por cima de todos os apps. */
 class IslandService : AccessibilityService() {
@@ -38,19 +51,41 @@ class IslandService : AccessibilityService() {
     private var owner: OverlayOwner? = null
     private var params: WindowManager.LayoutParams? = null
     private var popupJob: Job? = null
+    private var sleepJob: Job? = null
 
-    /** O que a ilha está mostrando agora (lido pela interface). */
-    val ui = IslandUiState(
-        popup = MutableStateFlow(null),
-        expanded = MutableStateFlow(false),
-        screenWidthDp = MutableStateFlow(360),
-    )
+    val ui = IslandUiState()
+    private val foregroundPkg = MutableStateFlow("")
+    private val locked = MutableStateFlow(false)
+    private var lastBt: BluetoothInfo? = null
 
-    private val power = object : BroadcastReceiver() {
+    private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (!Prefs.state.value.showCharging) return
-            val charging = i.action == Intent.ACTION_POWER_CONNECTED
-            show(Popup.Charging(ChargingInfo(batteryLevel(), charging)))
+            val s = Prefs.state.value
+            when (i.action) {
+                Intent.ACTION_POWER_CONNECTED, Intent.ACTION_POWER_DISCONNECTED -> if (s.chargingEnabled) {
+                    show(Popup.Charging(ChargingInfo(batteryLevel(), i.action == Intent.ACTION_POWER_CONNECTED)))
+                }
+                Intent.ACTION_SCREEN_OFF -> locked.value = true
+                Intent.ACTION_SCREEN_ON -> locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+                Intent.ACTION_USER_PRESENT -> locked.value = false
+                BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (s.bluetoothEnabled) {
+                    val d = device(i) ?: return
+                    val info = BluetoothInfo(deviceName(d), deviceKind(d), i.action == BluetoothDevice.ACTION_ACL_CONNECTED, null)
+                    lastBt = info
+                    show(Popup.Bluetooth(info))
+                }
+                ACTION_BT_BATTERY -> if (s.bluetoothEnabled) {
+                    val level = i.getIntExtra(EXTRA_BT_BATTERY, -1)
+                    val d = device(i) ?: return
+                    val prev = lastBt
+                    // Mostra a bateria só logo depois de conectar (para não repetir o aviso).
+                    if (level >= 0 && prev != null && prev.connected && prev.battery == null && prev.name == deviceName(d)) {
+                        val info = prev.copy(battery = level)
+                        lastBt = info
+                        if (ui.popup.value is Popup.Bluetooth) show(Popup.Bluetooth(info), haptic = false)
+                    }
+                }
+            }
         }
     }
 
@@ -58,41 +93,63 @@ class IslandService : AccessibilityService() {
         Prefs.init(this)
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         IslandBus.serviceRunning.value = true
-        registerReceiver(power, IntentFilter().apply {
+        locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+        val filter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
             addAction(Intent.ACTION_POWER_DISCONNECTED)
-        })
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_USER_PRESENT)
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+            addAction(ACTION_BT_BATTERY)
+        }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
+        addOverlay()
         scope.launch { IslandBus.popups.collect { show(it) } }
-        scope.launch { Prefs.state.collect { applyVisibility(); reposition() } }
+        scope.launch { Prefs.state.collect { reposition(); applyVisibility() } }
+        scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
+        // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
+        scope.launch {
+            IslandBus.call.collect { c ->
+                if (c?.incoming == true) {
+                    ui.popup.value = null
+                    vibrate()
+                }
+                if (c == null && ui.expanded.value && IslandBus.media.value == null && IslandBus.notifications.value.isEmpty()) ui.expanded.value = false
+                scheduleSleep()
+            }
+        }
+        scope.launch { IslandBus.media.collect { scheduleSleep() } }
+        scope.launch { ui.expanded.collect { scheduleSleep() } }
+        scope.launch { ui.asleep.collect { applyVisibility() } }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        // Painel de notificações e teclado não contam como "app aberto".
+        if (pkg == "com.android.systemui" || pkg == packageName || pkg.contains("inputmethod") || pkg.contains("keyboard")) return
+        foregroundPkg.value = pkg
+    }
+
     override fun onInterrupt() {}
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        applyVisibility()
         reposition()
+        applyVisibility()
     }
 
     override fun onDestroy() {
         IslandBus.serviceRunning.value = false
-        runCatching { unregisterReceiver(power) }
+        runCatching { unregisterReceiver(receiver) }
         removeOverlay()
         scope.cancel()
         super.onDestroy()
     }
 
-    private fun shouldShow(): Boolean {
-        val s = Prefs.state.value
-        if (!s.enabled) return false
-        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        return !(landscape && s.hideInLandscape)
-    }
-
-    private fun applyVisibility() {
-        if (shouldShow()) addOverlay() else removeOverlay()
-    }
+    // ---------- janela ----------
 
     @SuppressLint("ClickableViewAccessibility")
     private fun addOverlay() {
@@ -101,10 +158,7 @@ class IslandService : AccessibilityService() {
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
+            BASE_FLAGS,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
@@ -120,8 +174,13 @@ class IslandService : AccessibilityService() {
             setContent {
                 IslandUi(
                     state = ui,
-                    onTap = ::onTap,
-                    onLongPress = ::onLongPress,
+                    actions = IslandActions(
+                        onTap = { gesture(Prefs.state.value.tapGesture, tap = true) },
+                        onHold = { gesture(Prefs.state.value.holdGesture, tap = false) },
+                        onSwipe = ::swipe,
+                        onOpen = ::openPkg,
+                        onCollapse = ::collapse,
+                    ),
                 )
             }
             setOnTouchListener { _, e ->
@@ -135,6 +194,7 @@ class IslandService : AccessibilityService() {
         view = v
         reposition()
         runCatching { wm.addView(v, p) }.onFailure { view = null; owner = null; o.destroy() }
+        scheduleSleep()
     }
 
     private fun removeOverlay() {
@@ -142,6 +202,26 @@ class IslandService : AccessibilityService() {
         owner?.destroy()
         view = null
         owner = null
+    }
+
+    /** Mostra ou esconde sem recriar a janela (apps ocultos, tela de bloqueio, paisagem). */
+    private fun applyVisibility() {
+        val v = view ?: return
+        val p = params ?: return
+        val s = Prefs.state.value
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val hasCall = IslandBus.call.value != null
+        val visible = s.enabled &&
+            !(landscape && !s.showInLandscape) &&
+            !(locked.value && s.hideOnLockscreen && !hasCall) &&
+            (foregroundPkg.value !in s.hiddenApps || hasCall)
+        val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
+        v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+        val flags = if (visible && !sleepingGone) BASE_FLAGS else BASE_FLAGS or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (p.flags != flags) {
+            p.flags = flags
+            if (v.isAttachedToWindow) runCatching { wm.updateViewLayout(v, p) }
+        }
     }
 
     /** Centraliza a ilha na câmera frontal, somando os ajustes do usuário. */
@@ -156,7 +236,8 @@ class IslandService : AccessibilityService() {
         val pillH = (s.height * d).toInt()
         val baseY = cam?.let { (it.centerY() - pillH / 2).coerceAtLeast(0) } ?: (8 * d).toInt()
         p.x = baseX + (s.offsetX * d).toInt()
-        p.y = (baseY + (s.offsetY * d).toInt()).coerceAtLeast(0)
+        // A ilha tem 2 dp de margem em volta (para a borda).
+        p.y = (baseY + (s.offsetY * d).toInt() - (2 * d).toInt()).coerceAtLeast(0)
         view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
     }
 
@@ -171,61 +252,152 @@ class IslandService : AccessibilityService() {
         return top?.takeIf { !it.isEmpty }
     }
 
-    fun show(p: Popup) {
+    // ---------- comportamento ----------
+
+    fun show(p: Popup, haptic: Boolean = true) {
         if (view == null) return
+        if (IslandBus.call.value?.incoming == true && p !is Popup.Test) return
+        if (p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
         if (ui.expanded.value && p !is Popup.Test) return
+        ui.asleep.value = false
         ui.popup.value = p
-        if (Prefs.state.value.vibrate) view?.performHapticFeedback(HapticFeedbackConstants.CONFIRM.takeIf { Build.VERSION.SDK_INT >= 30 } ?: HapticFeedbackConstants.VIRTUAL_KEY)
+        if (haptic) vibrate()
         popupJob?.cancel()
+        val s = Prefs.state.value
+        if (p is Popup.Notification && s.keepUntilRead) return
         popupJob = scope.launch {
-            delay(Prefs.state.value.popupSeconds * 1000L)
+            delay(s.popupSeconds * 1000L)
             ui.popup.value = null
+            scheduleSleep()
         }
     }
 
-    private fun onTap() {
+    private fun vibrate() {
+        if (!Prefs.state.value.vibrate) return
+        val c = if (Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.VIRTUAL_KEY
+        view?.performHapticFeedback(c)
+    }
+
+    /** Some com a ilha depois de um tempo sem nenhuma atividade (se ligado). */
+    private fun scheduleSleep() {
+        sleepJob?.cancel()
+        ui.asleep.value = false
+        val secs = Prefs.state.value.autoHideSeconds
+        if (secs <= 0) return
+        sleepJob = scope.launch {
+            delay(secs * 1000L)
+            val busy = ui.popup.value != null || ui.expanded.value || IslandBus.call.value != null || IslandBus.media.value != null
+            if (!busy) ui.asleep.value = true
+        }
+    }
+
+    private fun canExpand() = IslandBus.call.value != null || IslandBus.media.value != null ||
+        IslandBus.notifications.value.isNotEmpty() || isCharging()
+
+    private fun gesture(g: Gesture, tap: Boolean) {
+        if (ui.asleep.value) {
+            scheduleSleep()
+            return
+        }
         val popup = ui.popup.value
-        when {
-            popup is Popup.Notification -> {
-                runCatching { popup.item.contentIntent?.send() }
-                ui.popup.value = null
+        if (tap && popup is Popup.Notification) {
+            runCatching { popup.item.contentIntent?.send() }
+            ui.popup.value = null
+            return
+        }
+        when (g) {
+            Gesture.Expand -> when {
+                ui.expanded.value -> collapse()
+                canExpand() -> {
+                    popupJob?.cancel()
+                    ui.popup.value = null
+                    ui.expanded.value = true
+                    if (!tap) vibrate()
+                }
             }
-            ui.expanded.value -> collapse()
-            IslandBus.media.value != null -> {
-                popupJob?.cancel()
-                ui.popup.value = null
-                ui.expanded.value = true
+            Gesture.OpenApp -> {
+                val pkg = IslandBus.call.value?.pkg
+                    ?: (popup as? Popup.Notification)?.item?.pkg
+                    ?: IslandBus.media.value?.pkg
+                    ?: IslandBus.notifications.value.firstOrNull()?.pkg
+                openPkg(pkg)
             }
-            IslandBus.notifications.value.isNotEmpty() -> {
-                popupJob?.cancel()
-                ui.popup.value = null
-                ui.expanded.value = true
-            }
+            Gesture.Nothing -> {}
         }
     }
 
-    private fun onLongPress() {
-        val media = IslandBus.media.value
-        val pkg = media?.pkg ?: (ui.popup.value as? Popup.Notification)?.item?.pkg
-        val intent = pkg?.let { packageManager.getLaunchIntentForPackage(it) }
-            ?: Intent(this, MainActivity::class.java)
+    private fun swipe() {
+        val popup = ui.popup.value
+        if (popup is Popup.Notification) {
+            if (Prefs.state.value.swipeToDismiss && popup.item.clearable) IslandBus.dismiss?.invoke(popup.item.key)
+            ui.popup.value = null
+        } else if (popup != null) {
+            ui.popup.value = null
+        } else if (ui.expanded.value) {
+            collapse()
+        }
+    }
+
+    private fun openPkg(pkg: String?) {
+        val intent = pkg?.let { packageManager.getLaunchIntentForPackage(it) } ?: Intent(this, MainActivity::class.java)
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(intent) }
         collapse()
     }
 
     private fun collapse() {
-        ui.expanded.value = false
+        if (ui.expanded.value) ui.expanded.value = false
     }
 
-    private fun batteryLevel(): Int {
-        val bm = getSystemService(BATTERY_SERVICE) as BatteryManager
-        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    private fun isCharging(): Boolean {
+        val i = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return false
+        val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        return st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
+    }
+
+    private fun batteryLevel(): Int =
+        (getSystemService(BATTERY_SERVICE) as BatteryManager).getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+
+    @Suppress("DEPRECATION")
+    private fun device(i: Intent): BluetoothDevice? =
+        if (Build.VERSION.SDK_INT >= 33) i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+        else i.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+
+    @SuppressLint("MissingPermission")
+    private fun deviceName(d: BluetoothDevice): String = runCatching { (if (Build.VERSION.SDK_INT >= 30) d.alias else null) ?: d.name }.getOrNull() ?: "Dispositivo Bluetooth"
+
+    @SuppressLint("MissingPermission")
+    private fun deviceKind(d: BluetoothDevice): BtKind {
+        val c = runCatching { d.bluetoothClass }.getOrNull() ?: return BtKind.Other
+        return when {
+            c.majorDeviceClass == BluetoothClass.Device.Major.WEARABLE -> BtKind.Watch
+            c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_HEADPHONES -> BtKind.Headphones
+            c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_WEARABLE_HEADSET ||
+                c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE -> BtKind.Earbuds
+            c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_LOUDSPEAKER ||
+                c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_PORTABLE_AUDIO ||
+                c.deviceClass == BluetoothClass.Device.AUDIO_VIDEO_HIFI_AUDIO -> BtKind.Speaker
+            c.majorDeviceClass == BluetoothClass.Device.Major.AUDIO_VIDEO -> BtKind.Earbuds
+            else -> BtKind.Other
+        }
+    }
+
+    companion object {
+        private const val BASE_FLAGS = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+
+        // Bateria de fones: broadcast do sistema que existe na maioria dos aparelhos, mas não é API pública.
+        private const val ACTION_BT_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
+        private const val EXTRA_BT_BATTERY = "android.bluetooth.device.extra.BATTERY_LEVEL"
     }
 }
 
-class IslandUiState(
-    val popup: MutableStateFlow<Popup?>,
-    val expanded: MutableStateFlow<Boolean>,
-    val screenWidthDp: MutableStateFlow<Int>,
+class IslandActions(
+    val onTap: () -> Unit,
+    val onHold: () -> Unit,
+    val onSwipe: () -> Unit,
+    val onOpen: (String?) -> Unit,
+    val onCollapse: () -> Unit,
 )
