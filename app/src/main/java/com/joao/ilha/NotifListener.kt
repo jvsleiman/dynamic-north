@@ -99,7 +99,7 @@ class NotifListener : NotificationListenerService() {
         val ex = n.extras
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return null
         var text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
-        if (!Prefs.state.value.showSensitive && isSensitive(sbn, title, text)) text = "Conteúdo sensível oculto"
+        if (!Prefs.state.value.showSensitive && isSensitive(title, text)) text = "Conteúdo sensível oculto"
         return NotifItem(
             key = sbn.key,
             pkg = sbn.packageName,
@@ -114,11 +114,7 @@ class NotifListener : NotificationListenerService() {
         )
     }
 
-    private fun isSensitive(sbn: StatusBarNotification, title: String, text: String): Boolean {
-        if (Build.VERSION.SDK_INT >= 35) {
-            val r = Ranking()
-            if (currentRanking.getRanking(sbn.key, r) && r.hasSensitiveContent()) return true
-        }
+    private fun isSensitive(title: String, text: String): Boolean {
         val all = "$title $text".lowercase()
         return Regex("\\b\\d{4,8}\\b").containsMatchIn(all) &&
             listOf("código", "codigo", "code", "otp", "senha", "verifica", "token").any { it in all }
