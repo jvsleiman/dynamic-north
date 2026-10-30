@@ -27,6 +27,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import kotlinx.coroutines.CoroutineScope
@@ -164,12 +165,35 @@ class IslandService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val type = event?.eventType ?: return
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+        // Com vídeo em janelinha (PiP), o app do vídeo continua mandando eventos mesmo estando em
+        // segundo plano. Por isso o app "aberto" vem da lista de janelas, ignorando a janela PiP.
+        val fromWindows = mainAppFromWindows()
+        if (fromWindows != null) {
+            foregroundPkg.value = fromWindows
+            return
+        }
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (Build.VERSION.SDK_INT >= 26 && windows.any { it.isInPictureInPictureMode && it.root?.packageName?.toString() == event.packageName?.toString() }) return
         val pkg = event.packageName?.toString() ?: return
-        // Painel de notificações e teclado não contam como "app aberto".
-        if (pkg == "com.android.systemui" || pkg == packageName || pkg.contains("inputmethod") || pkg.contains("keyboard")) return
+        if (ignoredPkg(pkg)) return
         foregroundPkg.value = pkg
     }
+
+    // Painel de notificações e teclado não contam como "app aberto".
+    private fun ignoredPkg(pkg: String) =
+        pkg == "com.android.systemui" || pkg == packageName || pkg.contains("inputmethod") || pkg.contains("keyboard")
+
+    /** App em tela cheia de verdade: a janela de app ativa que não está em PiP. */
+    private fun mainAppFromWindows(): String? = runCatching {
+        val apps = windows.filter { w ->
+            w.type == AccessibilityWindowInfo.TYPE_APPLICATION && !(Build.VERSION.SDK_INT >= 26 && w.isInPictureInPictureMode)
+        }
+        val main = apps.firstOrNull { it.isActive || it.isFocused } ?: apps.firstOrNull()
+        val pkg = main?.root?.packageName?.toString()
+        pkg?.takeUnless { ignoredPkg(it) }
+    }.getOrNull()
 
     override fun onInterrupt() {}
 
