@@ -35,9 +35,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
+enum class ExpandKind { Activity, Battery, Clock, Notifications }
+
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
     val expanded = MutableStateFlow(false)
+    /** De onde a ilha foi aberta: decide qual layout aparece. */
+    val expandKind = MutableStateFlow(ExpandKind.Activity)
     val asleep = MutableStateFlow(false)
     val screenWidthDp = MutableStateFlow(360)
 }
@@ -322,7 +326,19 @@ class IslandService : AccessibilityService() {
     }
 
     private fun canExpand() = IslandBus.call.value != null || IslandBus.media.value != null ||
-        IslandBus.notifications.value.isNotEmpty() || isCharging()
+        IslandBus.notifications.value.isNotEmpty() || isCharging() || Prefs.state.value.idleStyle != IdleStyle.Simple
+
+    /** Abre o layout que corresponde ao que a ilha está mostrando agora. */
+    private fun kindForNow(): ExpandKind {
+        if (IslandBus.call.value != null || IslandBus.media.value != null) return ExpandKind.Activity
+        if (ui.popup.value is Popup.Charging) return ExpandKind.Battery
+        return when (Prefs.state.value.idleStyle) {
+            IdleStyle.Battery -> ExpandKind.Battery
+            IdleStyle.Clock, IdleStyle.Date, IdleStyle.ClockBattery -> ExpandKind.Clock
+            IdleStyle.AppIcons, IdleStyle.Count -> ExpandKind.Notifications
+            IdleStyle.Simple -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Battery else ExpandKind.Notifications
+        }
+    }
 
     private fun gesture(g: Gesture, tap: Boolean) {
         if (ui.asleep.value) {
@@ -339,6 +355,7 @@ class IslandService : AccessibilityService() {
             Gesture.Expand -> when {
                 ui.expanded.value -> collapse()
                 canExpand() -> {
+                    ui.expandKind.value = kindForNow()
                     popupJob?.cancel()
                     ui.popup.value = null
                     ui.expanded.value = true

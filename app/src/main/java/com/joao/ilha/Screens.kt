@@ -15,6 +15,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -643,12 +647,94 @@ private fun WidthGroup(s: Settings) {
 @Composable
 fun IdleScreen(back: () -> Unit) {
     val s by Prefs.state.collectAsState()
+    val p = LocalPalette.current
     Page("Ilha parada", back) {
-        Group(
-            "Quando nada está acontecendo",
-            footer = "O meio da ilha fica livre para a câmera; a informação aparece nas pontas. Em \"Ícones dos apps\" e \"Número\", a ilha volta ao tamanho simples quando não há notificações.",
+        Text(
+            "Escolha o que a ilha mostra quando nada está acontecendo. Tocar nela abre o layout do estilo (bateria, relógio ou notificações).",
+            color = p.secondary, fontSize = 14.sp, modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 14.dp),
+        )
+        IdleStyle.entries.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                pair.forEach { style ->
+                    IdleCard(style, style == s.idleStyle, Modifier.weight(1f)) { s.set { copy(idleStyle = style) } }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+        Group(footer = "Em \"Ícones dos apps\" e \"Número\", a ilha volta ao tamanho simples quando não há notificações.") {
+            NavRow("Testar", divider = false) { IslandBus.show(Popup.Test) }
+        }
+    }
+}
+
+private val idleHints = mapOf(
+    IdleStyle.Simple to "Só a pílula preta",
+    IdleStyle.AppIcons to "Abre a lista de notificações",
+    IdleStyle.Count to "Abre a lista de notificações",
+    IdleStyle.Clock to "Abre o relógio",
+    IdleStyle.Date to "Abre o relógio",
+    IdleStyle.Battery to "Abre a bateria",
+    IdleStyle.ClockBattery to "Abre o relógio",
+)
+
+/** Card com a pré-visualização do estilo numa "tela" escura. */
+@Composable
+private fun IdleCard(style: IdleStyle, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val p = LocalPalette.current
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(p.card)
+            .border(if (selected) 2.5.dp else 0.dp, if (selected) Accent else Color.Transparent, RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(10.dp),
+    ) {
+        Box(
+            Modifier.fillMaxWidth().height(64.dp).clip(RoundedCornerShape(12.dp))
+                .background(Brush.verticalGradient(listOf(Color(0xFF2B2D42), Color(0xFF14151F)))),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            ChoiceRows(IdleStyle.entries, s.idleStyle, { it.label }) { v -> s.set { copy(idleStyle = v) } }
+            IdlePill(style, Modifier.padding(top = 10.dp))
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(style.label, color = p.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 2)
+            if (selected) Icon(Icons.Rounded.CheckCircle, null, tint = Accent, modifier = Modifier.size(20.dp))
+        }
+        Text(idleHints[style].orEmpty(), color = p.secondary, fontSize = 12.sp, maxLines = 2)
+    }
+}
+
+/** Desenho da ilha com dados de exemplo. */
+@Composable
+private fun IdlePill(style: IdleStyle, modifier: Modifier) {
+    val small = style == IdleStyle.Simple
+    val txt: @Composable (String) -> Unit = { Text(it, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold) }
+    val dot: @Composable (Color) -> Unit = { c -> Box(Modifier.size(13.dp).clip(CircleShape).background(c)) }
+    Row(
+        modifier.width(if (small) 62.dp else 118.dp).height(22.dp).clip(RoundedCornerShape(11.dp)).background(Color.Black).padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        when (style) {
+            IdleStyle.Simple -> {}
+            IdleStyle.AppIcons -> { dot(Color(0xFF25D366)); dot(Color(0xFFE1306C)) }
+            IdleStyle.Count -> { Icon(Icons.Rounded.Notifications, null, tint = Color(0xFFB4B4BC), modifier = Modifier.size(12.dp)); txt("3") }
+            IdleStyle.Clock -> { txt("02:12"); Spacer(Modifier.width(1.dp)) }
+            IdleStyle.Date -> { txt("qui 30"); Spacer(Modifier.width(1.dp)) }
+            IdleStyle.Battery -> { Spacer(Modifier.width(1.dp)); BatteryMini() }
+            IdleStyle.ClockBattery -> { txt("02:12"); BatteryMini() }
+        }
+    }
+}
+
+@Composable
+private fun BatteryMini() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("58%", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.width(2.dp))
+        Box(Modifier.width(14.dp).height(8.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF3A3A3C))) {
+            Box(Modifier.fillMaxWidth(0.58f).height(8.dp).background(SwitchGreen))
         }
     }
 }

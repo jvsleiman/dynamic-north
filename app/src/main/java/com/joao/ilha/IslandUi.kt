@@ -125,7 +125,7 @@ private val LocalIslandColors = compositionLocalOf { IslandColors(Color.Black, C
 private enum class Mode(val large: Boolean) {
     Idle(false), Asleep(false), Media(false), Call(false), Charging(false), Bluetooth(false), SmallNotif(false),
     Notification(true), Test(true), IncomingCall(true),
-    ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true),
+    ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true),
 }
 
 @Composable
@@ -133,6 +133,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val s by Prefs.state.collectAsState()
     val popup by state.popup.collectAsState()
     val expanded by state.expanded.collectAsState()
+    val kind by state.expandKind.collectAsState()
     val asleep by state.asleep.collectAsState()
     val media by IslandBus.media.collectAsState()
     val notifs by IslandBus.notifications.collectAsState()
@@ -142,8 +143,11 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val mode = when {
         call?.incoming == true -> Mode.IncomingCall
         expanded && call != null -> Mode.ExpandedCall
-        expanded && media != null -> Mode.ExpandedMedia
+        expanded && kind == ExpandKind.Activity && media != null -> Mode.ExpandedMedia
+        expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
+        expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
         expanded && notifs.isNotEmpty() -> Mode.ExpandedList
+        expanded && media != null -> Mode.ExpandedMedia
         expanded -> Mode.ExpandedBattery
         popup is Popup.Notification -> if (s.notifExpanded) Mode.Notification else Mode.SmallNotif
         popup is Popup.Charging -> Mode.Charging
@@ -197,6 +201,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedMedia -> wide to (196.dp + (if (s.volumeInPlayer) 34.dp else 0.dp)) * k * t
         Mode.ExpandedList -> wide to (ListHeader + ListRow * rows) * t + 14.dp
         Mode.ExpandedBattery -> wide to 112.dp * k
+        Mode.ExpandedClock -> wide to 132.dp * k * t
     }
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
@@ -220,6 +225,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     LaunchedEffect(totalW, density.density) { actions.onWidth(with(density) { totalW.roundToPx() }) }
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
+        // A janela pode ficar mais larga que a ilha (enquanto encolhe): mantém centralizada.
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
         Row(verticalAlignment = Alignment.Top) {
             // Espaço igual do outro lado para a ilha principal continuar centralizada.
             if (hasSecond && s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
@@ -262,6 +269,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.ExpandedMedia -> media?.let { ExpandedMedia(it, s, actions) }
                         Mode.ExpandedList -> NotificationList(notifs, actions)
                         Mode.ExpandedBattery -> BatteryCard()
+                        Mode.ExpandedClock -> ClockCard()
                     }
                 }
             }
@@ -270,6 +278,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                 Bubble(bubble, colors.bg, bubbleContent)
             }
             if (hasSecond && !s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
+        }
         }
     }
 }
@@ -788,6 +797,41 @@ private fun SwipeRow(n: NotifItem, ic: Float, actions: IslandActions) {
         Column(Modifier.weight(1f)) {
             Text(n.title, color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(n.text.ifBlank { n.appName }, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Ilha aberta a partir do estilo Hora/Data: relógio grande, data, próximo alarme e bateria. */
+@Composable
+private fun ClockCard() {
+    val col = LocalIslandColors.current
+    val ctx = LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    val br = java.util.Locale("pt", "BR")
+    val time = java.text.SimpleDateFormat("HH:mm", br).format(java.util.Date(now))
+    val date = java.text.SimpleDateFormat("EEEE, d 'de' MMMM", br).format(java.util.Date(now)).replaceFirstChar { it.uppercase() }
+    val alarm = remember {
+        (ctx.getSystemService(android.content.Context.ALARM_SERVICE) as android.app.AlarmManager).nextAlarmClock?.triggerTime
+    }
+    val battery = batteryNow(ctx)
+    Row(Modifier.fillMaxSize().padding(horizontal = 22.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(time, color = col.text, fontSize = 44.sp, fontWeight = FontWeight.Bold)
+            Text(date, color = col.dim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            if (alarm != null) {
+                Text("Alarme", color = col.dim, fontSize = 11.sp)
+                Text(java.text.SimpleDateFormat("EEE HH:mm", br).format(java.util.Date(alarm)).replace(".", ""), color = col.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(6.dp))
+            }
+            BatteryText(battery, 30.dp)
         }
     }
 }
