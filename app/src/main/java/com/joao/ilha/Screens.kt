@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Display, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Display, Customize, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -114,7 +114,8 @@ fun HomeScreen(go: (Screen) -> Unit) {
         }
         Group {
             SwitchRow("Barra da Ilha", s.enabled) { v -> s.set { copy(enabled = v) } }
-            NavRow("Exibição", divider = false) { go(Screen.Display) }
+            NavRow("Exibição") { go(Screen.Display) }
+            NavRow("Personalizar layouts", divider = false) { go(Screen.Customize) }
         }
         Group("Recursos") {
             NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
@@ -227,6 +228,7 @@ fun NotificationsScreen(back: () -> Unit, go: (Screen) -> Unit) {
             SwitchRow("Deslizar para remover", s.swipeToDismiss, "Desliza para o lado e a notificação é apagada") { v -> s.set { copy(swipeToDismiss = v) } }
             SwitchRow("Mostrar conteúdo sensível", s.showSensitive, "Como códigos de verificação") { v -> s.set { copy(showSensitive = v) } }
             SwitchRow("Na tela de bloqueio", s.notifOnLockscreen) { v -> s.set { copy(notifOnLockscreen = v) } }
+            SwitchRow("Botões da notificação", s.showNotifActions, "Responder, marcar como lida e outros, direto na ilha") { v -> s.set { copy(showNotifActions = v) } }
             SwitchRow("Mostrar número de notificações", s.showCount, divider = false) { v -> s.set { copy(showCount = v) } }
         }
         Group("Não aparecem?", footer = "Desative e ative de novo o acesso às notificações do Ilha.") {
@@ -261,9 +263,12 @@ fun MusicScreen(back: () -> Unit, go: (Screen) -> Unit) {
         Group(footer = "Toque na ilha durante a música para abrir o player.") {
             SwitchRow("Reprodutor de música", s.musicEnabled, divider = false) { v -> s.set { copy(musicEnabled = v) } }
         }
+        ReactiveBarsGroup(s)
         Group("Outras configurações") {
             SwitchRow("Capa desfocada no fundo", s.blurArt) { v -> s.set { copy(blurArt = v) } }
             SwitchRow("Botões de 10 segundos", s.seekButtons) { v -> s.set { copy(seekButtons = v) } }
+            SwitchRow("Barra de volume no player", s.volumeInPlayer) { v -> s.set { copy(volumeInPlayer = v) } }
+            SwitchRow("Deslizar troca a música", s.swipeChangesTrack, "Na ilha pequena: direita volta, esquerda avança") { v -> s.set { copy(swipeChangesTrack = v) } }
             SwitchRow("Só durante a reprodução", s.musicOnlyWhilePlaying, "Some quando a música é pausada") { v -> s.set { copy(musicOnlyWhilePlaying = v) } }
             NavRow("Apps bloqueados", if (s.blockedMusicApps.isEmpty()) "Nenhum" else s.blockedMusicApps.size.toString(), divider = false) { go(Screen.BlockedMusicApps) }
         }
@@ -565,4 +570,59 @@ fun listenerEnabled(ctx: Context): Boolean {
 
 fun open(ctx: Context, action: String) {
     runCatching { ctx.startActivity(Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+}
+
+// ---------- barrinhas que reagem ao som ----------
+
+@Composable
+private fun ReactiveBarsGroup(s: Settings) {
+    val ctx = LocalContext.current
+    var granted by remember { mutableStateOf(AudioLevels.granted(ctx)) }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        granted = ok
+        if (ok) s.set { copy(reactiveBars = true) }
+    }
+    Group(
+        "Animação do som",
+        footer = "As barrinhas seguem a música de verdade. O Android pede a permissão de microfone para isso, mas o Ilha não grava nada: só lê a intensidade do som que está tocando.",
+    ) {
+        SwitchRow("Barrinhas reagem ao som", s.reactiveBars && granted, divider = false) { v ->
+            if (v && !granted) ask.launch(Manifest.permission.RECORD_AUDIO) else s.set { copy(reactiveBars = v) }
+        }
+    }
+}
+
+// ---------- personalizar ----------
+
+@Composable
+fun CustomizeScreen(back: () -> Unit) {
+    val s by Prefs.state.collectAsState()
+    Page("Personalizar", back, action = {
+        TextAction("Redefinir") {
+            val d = Settings()
+            s.set { copy(textScale = d.textScale, iconScale = d.iconScale, layoutScale = d.layoutScale, listRows = d.listRows) }
+        }
+    }) {
+        Group("Testar", footer = "Mude os valores e toque em um teste para ver na ilha.") {
+            NavRow("Mostrar aviso de teste") { IslandBus.show(Popup.Test) }
+            NavRow("Mostrar carregamento", divider = false) {
+                IslandBus.show(Popup.Charging(ChargingInfo(80, true)))
+            }
+        }
+        Group("Texto e ícones", footer = "Se o texto da ilha ficar cortado ou grande demais, ajuste aqui. A ilha não segue o tamanho de fonte do sistema.") {
+            SliderRow("Tamanho do texto", s.textScale, 70..150, "%") { v -> s.set { copy(textScale = v) } }
+            SliderRow("Tamanho dos ícones e fotos", s.iconScale, 60..150, "%", divider = false) { v -> s.set { copy(iconScale = v) } }
+        }
+        Group("Ilha aberta", footer = "Altura das ilhas grandes (notificação, música, chamada, bateria).") {
+            SliderRow("Altura dos layouts", s.layoutScale, 70..150, "%") { v -> s.set { copy(layoutScale = v) } }
+            SliderRow("Itens visíveis na lista de notificações", s.listRows, 2..8, divider = false) { v -> s.set { copy(listRows = v) } }
+        }
+        Group("Tamanho e posição da ilha") {
+            SliderRow("Largura", s.width, 40..240, " dp") { v -> s.set { copy(width = v) } }
+            SliderRow("Altura", s.height, 16..60, " dp") { v -> s.set { copy(height = v) } }
+            SliderRow("Horizontal", s.offsetX, -180..180, " dp") { v -> s.set { copy(offsetX = v) } }
+            SliderRow("Vertical", s.offsetY, -40..160, " dp") { v -> s.set { copy(offsetY = v) } }
+            SliderRow("Largura máxima aberta", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
+        }
+    }
 }

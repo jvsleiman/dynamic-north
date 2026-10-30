@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
+/** Botão de uma notificação; com [remoteInput] é uma resposta rápida. */
+data class NotifAction(val title: String, val intent: PendingIntent, val remoteInput: android.app.RemoteInput?)
+
 data class NotifItem(
     val key: String,
     val pkg: String,
@@ -19,6 +22,7 @@ data class NotifItem(
     val contentIntent: PendingIntent?,
     val postedAt: Long,
     val clearable: Boolean,
+    val actions: List<NotifAction> = emptyList(),
 )
 
 data class MediaInfo(
@@ -72,6 +76,9 @@ object IslandBus {
 
     /** Ações que precisam do leitor de notificações (remover uma ou todas). */
     @Volatile var dismiss: ((String?) -> Unit)? = null
+
+    /** Resposta rápida aguardando o texto na [ReplyActivity]. */
+    @Volatile var pendingReply: PendingReply? = null
 
     /** Relê notificações e player depois de mudar um ajuste (apps bloqueados etc.). */
     @Volatile var refresh: (() -> Unit)? = null

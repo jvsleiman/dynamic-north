@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
                 when (stack.last()) {
                     Screen.Home -> HomeScreen(go)
                     Screen.Display -> DisplayScreen(back)
+                    Screen.Customize -> CustomizeScreen(back)
                     Screen.Notifications -> NotificationsScreen(back, go)
                     Screen.Calls -> CallsScreen(back)
                     Screen.Music -> MusicScreen(back, go)

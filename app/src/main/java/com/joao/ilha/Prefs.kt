@@ -49,6 +49,13 @@ data class Settings(
     val borderColor: Long = 0xFF3A3A3C,
     val motion: Motion = Motion.Liquid,
 
+    // Personalizar layouts
+    val textScale: Int = 100,
+    val iconScale: Int = 100,
+    val layoutScale: Int = 100,
+    val listRows: Int = 4,
+    val showNotifActions: Boolean = true,
+
     // Notificações
     val notifEnabled: Boolean = true,
     val notifExpanded: Boolean = true,
@@ -71,6 +78,9 @@ data class Settings(
     val seekButtons: Boolean = true,
     val musicOnlyWhilePlaying: Boolean = false,
     val blockedMusicApps: Set<String> = emptySet(),
+    val reactiveBars: Boolean = true,
+    val swipeChangesTrack: Boolean = true,
+    val volumeInPlayer: Boolean = true,
 
     // Outros recursos
     val chargingEnabled: Boolean = true,
@@ -123,6 +133,7 @@ object Prefs {
             bgColor = d.bgColor, textColor = d.textColor, autoColor = d.autoColor,
             borderSmall = d.borderSmall, borderLarge = d.borderLarge, borderColor = d.borderColor,
             motion = d.motion,
+            textScale = d.textScale, iconScale = d.iconScale, layoutScale = d.layoutScale, listRows = d.listRows,
         )
     }
 }

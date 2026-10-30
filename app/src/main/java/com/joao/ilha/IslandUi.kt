@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.drawable.Icon
+import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
@@ -11,6 +12,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -34,6 +36,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -42,6 +45,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeDown
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.BatteryStd
 import androidx.compose.material.icons.rounded.Bluetooth
@@ -67,7 +72,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -88,6 +96,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -96,12 +107,18 @@ import androidx.compose.ui.unit.sp
 import androidx.palette.graphics.Palette
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val Green = Color(0xFF34C759)
+private val ListHeader = 46.dp
+private val ListRow = 56.dp
 private val Red = Color(0xFFFF3B30)
 
 /** Cores da ilha (fundo e texto), escolhidas nos ajustes ou tiradas da capa/ícone. */
 private data class IslandColors(val bg: Color, val text: Color, val dim: Color)
+
+/** Escala dos ícones e fotos escolhida em Personalizar. */
+private val LocalIconScale = compositionLocalOf { 1f }
 
 private val LocalIslandColors = compositionLocalOf { IslandColors(Color.Black, Color.White, Color(0xFFB4B4BC)) }
 
@@ -156,6 +173,11 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val baseH = s.height.dp
     val grow = if (s.growWhenActive) baseH * 2 + 12.dp else 0.dp
     val smallR = baseH * (s.smallRadius / 100f)
+    val k = s.layoutScale / 100f
+    val t = s.textScale / 100f
+    val popupItem = (popup as? Popup.Notification)?.item
+    val actionsH = if (s.showNotifActions && popupItem?.actions?.isNotEmpty() == true) 46.dp else 0.dp
+    val rows = notifs.size.coerceIn(1, s.listRows)
     val (tw, th) = when (mode) {
         Mode.Idle -> baseW to baseH
         Mode.Asleep -> (if (s.keepMiniWhenHidden) baseH else 1.dp) to baseH
@@ -163,12 +185,13 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Charging -> baseW + grow + 24.dp to baseH
         Mode.Bluetooth -> baseW + grow + 48.dp to baseH
         Mode.SmallNotif -> minOf(wide, baseW + grow + 120.dp) to baseH
-        Mode.Notification, Mode.Test -> wide to 78.dp
-        Mode.IncomingCall -> wide to 84.dp
-        Mode.ExpandedCall -> wide to 132.dp
-        Mode.ExpandedMedia -> wide to if (s.seekButtons) 206.dp else 196.dp
-        Mode.ExpandedList -> wide to (76 + 58 * notifs.size.coerceAtMost(4)).dp
-        Mode.ExpandedBattery -> wide to 112.dp
+        Mode.Notification -> wide to 78.dp * k * t + actionsH
+        Mode.Test -> wide to 78.dp * k * t
+        Mode.IncomingCall -> wide to 84.dp * k
+        Mode.ExpandedCall -> wide to 132.dp * k
+        Mode.ExpandedMedia -> wide to (196.dp + (if (s.volumeInPlayer) 34.dp else 0.dp)) * k * t
+        Mode.ExpandedList -> wide to (ListHeader + ListRow * rows) * t + 14.dp
+        Mode.ExpandedBattery -> wide to 112.dp * k
     }
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
@@ -186,7 +209,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         else secondNotif?.let { NotifPicture(it, baseH - 8.dp) }
     }
 
-    CompositionLocalProvider(LocalIslandColors provides colors) {
+    val density = LocalDensity.current
+    val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
+    CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
         Row(verticalAlignment = Alignment.Top) {
             // Espaço igual do outro lado para a ilha principal continuar centralizada.
             if (hasSecond && s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
@@ -204,7 +229,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         var drag = 0f
                         detectHorizontalDragGestures(
                             onDragStart = { drag = 0f },
-                            onDragEnd = { if (abs(drag) > 60.dp.toPx()) actions.onSwipe() },
+                            onDragEnd = { if (abs(drag) > 60.dp.toPx()) actions.onSwipe(drag) },
                             onHorizontalDrag = { _, d -> drag += d },
                         )
                     },
@@ -222,11 +247,11 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Charging -> (popup as? Popup.Charging)?.let { CompactCharging(it.info, baseH) }
                         Mode.Bluetooth -> (popup as? Popup.Bluetooth)?.let { CompactBluetooth(it.info, baseH) }
                         Mode.SmallNotif -> (popup as? Popup.Notification)?.let { SmallNotification(it.item, baseH) }
-                        Mode.Notification -> (popup as? Popup.Notification)?.let { NotificationBanner(it.item) }
+                        Mode.Notification -> (popup as? Popup.Notification)?.let { NotificationBanner(it.item, s.showNotifActions, actions) }
                         Mode.Test -> TestBanner()
                         Mode.IncomingCall -> call?.let { IncomingCall(it) }
                         Mode.ExpandedCall -> call?.let { ExpandedCall(it, actions) }
-                        Mode.ExpandedMedia -> media?.let { ExpandedMedia(it, s) }
+                        Mode.ExpandedMedia -> media?.let { ExpandedMedia(it, s, actions) }
                         Mode.ExpandedList -> NotificationList(notifs, actions)
                         Mode.ExpandedBattery -> BatteryCard()
                     }
@@ -399,19 +424,39 @@ private fun SmallNotification(n: NotifItem, h: Dp) {
 // ---------- modos grandes ----------
 
 @Composable
-private fun NotificationBanner(n: NotifItem) {
+private fun NotificationBanner(n: NotifItem, showActions: Boolean, actions: IslandActions) {
     val col = LocalIslandColors.current
-    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        NotifPicture(n, 46.dp)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(n.title, color = col.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (n.text.isNotBlank()) Text(n.text, color = col.dim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val ic = LocalIconScale.current
+    Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            NotifPicture(n, 46.dp * ic)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(n.title, color = col.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (n.text.isNotBlank()) Text(n.text, color = col.dim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(8.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                SmallIcon(n.smallIcon, 16.dp * ic)
+                Text(n.appName, color = col.dim, fontSize = 10.sp, maxLines = 1)
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            SmallIcon(n.smallIcon, 16.dp)
-            Text(n.appName, color = col.dim, fontSize = 10.sp, maxLines = 1)
+        if (showActions && n.actions.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                n.actions.forEach { a ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(17.dp))
+                            .background(col.text.copy(alpha = 0.14f))
+                            .pointerInput(a) { detectTapGestures { actions.onAction(n, a) } },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(a.title, color = col.text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
     }
 }
@@ -467,7 +512,7 @@ private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
 }
 
 @Composable
-private fun ExpandedMedia(m: MediaInfo, s: Settings) {
+private fun ExpandedMedia(m: MediaInfo, s: Settings, actions: IslandActions) {
     val col = LocalIslandColors.current
     val controls = m.controller.transportControls
     Box(Modifier.fillMaxSize()) {
@@ -482,7 +527,9 @@ private fun ExpandedMedia(m: MediaInfo, s: Settings) {
         }
         Column(Modifier.fillMaxSize().padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Art(art, 58.dp, RoundedCornerShape(14.dp))
+                Box(Modifier.pointerInput(m.pkg) { detectTapGestures { actions.onOpen(m.pkg) } }) {
+                    Art(art, 58.dp * LocalIconScale.current, RoundedCornerShape(14.dp))
+                }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(m.title, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -492,6 +539,10 @@ private fun ExpandedMedia(m: MediaInfo, s: Settings) {
             }
             Spacer(Modifier.height(14.dp))
             Progress(m)
+            if (s.volumeInPlayer) {
+                Spacer(Modifier.height(8.dp))
+                VolumeBar()
+            }
             Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                 if (s.seekButtons) Control(Icons.Rounded.Replay10, 28.dp) { controls.seekTo((livePosition(m) - 10_000).coerceAtLeast(0)) }
@@ -521,24 +572,74 @@ private fun Progress(m: MediaInfo) {
     }
     val pos = if (m.playing) m.positionMs + (now - m.positionAt) else m.positionMs
     val dur = m.durationMs
-    val frac = if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
+    // Enquanto arrasta, mostra a posição do dedo; ao soltar, pula para ela.
+    var dragFrac by remember { mutableStateOf<Float?>(null) }
+    val frac = dragFrac ?: if (dur > 0) (pos.toFloat() / dur).coerceIn(0f, 1f) else 0f
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(fmt(pos), color = col.dim, fontSize = 11.sp)
+        Text(fmt(if (dragFrac != null) (frac * dur).toLong() else pos), color = col.dim, fontSize = 11.sp)
         Box(
             Modifier
                 .weight(1f)
                 .padding(horizontal = 10.dp)
-                .height(16.dp)
+                .height(22.dp)
                 .pointerInput(dur) {
                     detectTapGestures { o -> if (dur > 0) m.controller.transportControls.seekTo((o.x / size.width * dur).toLong()) }
+                }
+                .pointerInput(dur) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { o -> dragFrac = (o.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = {
+                            dragFrac?.let { f -> if (dur > 0) m.controller.transportControls.seekTo((f * dur).toLong()) }
+                            dragFrac = null
+                        },
+                        onDragCancel = { dragFrac = null },
+                        onHorizontalDrag = { ch, _ -> ch.consume(); dragFrac = (ch.position.x / size.width).coerceIn(0f, 1f) },
+                    )
                 },
             contentAlignment = Alignment.CenterStart,
         ) {
-            Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(col.text.copy(alpha = 0.2f))) {
+            val barH = if (dragFrac != null) 8.dp else 4.dp
+            Box(Modifier.fillMaxWidth().height(barH).clip(CircleShape).background(col.text.copy(alpha = 0.2f))) {
                 Box(Modifier.fillMaxHeight().fillMaxWidth(frac).background(col.text))
             }
         }
         Text(if (dur > 0) fmt(dur) else "--:--", color = col.dim, fontSize = 11.sp)
+    }
+}
+
+/** Volume da música, arrastando ou tocando na barra. */
+@Composable
+private fun VolumeBar() {
+    val col = LocalIslandColors.current
+    val ctx = LocalContext.current
+    val am = remember { ctx.getSystemService(android.content.Context.AUDIO_SERVICE) as AudioManager }
+    val max = remember { am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
+    var vol by remember { mutableIntStateOf(am.getStreamVolume(AudioManager.STREAM_MUSIC)) }
+    fun set(f: Float) {
+        val v = (f.coerceIn(0f, 1f) * max).roundToInt()
+        if (v != vol) {
+            vol = v
+            runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, v, 0) }
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.AutoMirrored.Rounded.VolumeDown, null, tint = col.dim, modifier = Modifier.size(18.dp))
+        Box(
+            Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp)
+                .height(22.dp)
+                .pointerInput(Unit) { detectTapGestures { o -> set(o.x / size.width) } }
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { ch, _ -> ch.consume(); set(ch.position.x / size.width) }
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(col.text.copy(alpha = 0.2f))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(vol.toFloat() / max).background(col.text))
+            }
+        }
+        Icon(Icons.AutoMirrored.Rounded.VolumeUp, null, tint = col.dim, modifier = Modifier.size(18.dp))
     }
 }
 
@@ -562,32 +663,54 @@ private fun Timer(startedAt: Long, color: Color, size: Int) {
 @Composable
 private fun NotificationList(list: List<NotifItem>, actions: IslandActions) {
     val col = LocalIslandColors.current
-    Column(Modifier.fillMaxSize().padding(top = 14.dp, bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+    val ic = LocalIconScale.current
+    Column(Modifier.fillMaxSize().padding(bottom = 8.dp)) {
+        Row(Modifier.fillMaxWidth().height(ListHeader * LocalDensity.current.fontScale).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Notificações", color = col.text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             Text(
                 "Limpar tudo", color = Color(0xFF0A84FF), fontSize = 13.sp,
                 modifier = Modifier.pointerInput(Unit) { detectTapGestures { IslandBus.dismiss?.invoke(null); actions.onCollapse() } },
             )
         }
-        Spacer(Modifier.height(6.dp))
         LazyColumn(Modifier.fillMaxSize()) {
-            items(list.take(30), key = { it.key }) { n ->
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.send() }; actions.onCollapse() } }
-                        .padding(horizontal = 16.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NotifPicture(n, 38.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(n.title, color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(n.text.ifBlank { n.appName }, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                }
+            items(list.take(50), key = { it.key }) { n -> SwipeRow(n, ic, actions) }
+        }
+    }
+}
+
+/** Linha da lista: toque abre, deslizar para o lado apaga. */
+@Composable
+private fun SwipeRow(n: NotifItem, ic: Float, actions: IslandActions) {
+    val col = LocalIslandColors.current
+    var dx by remember(n.key) { mutableFloatStateOf(0f) }
+    val shown by animateFloatAsState(dx, label = "dx")
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(ListRow * LocalDensity.current.fontScale)
+            .offset { IntOffset(shown.toInt(), 0) }
+            .alpha((1f - abs(shown) / 600f).coerceIn(0.2f, 1f))
+            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.send() }; actions.onCollapse() } }
+            .pointerInput(n.key) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (abs(dx) > 90.dp.toPx() && n.clearable) {
+                            dx = if (dx > 0) 1200f else -1200f
+                            actions.onDismiss(n.key)
+                        } else dx = 0f
+                    },
+                    onDragCancel = { dx = 0f },
+                    onHorizontalDrag = { ch, d -> ch.consume(); dx += d },
+                )
             }
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NotifPicture(n, 38.dp * ic)
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(n.title, color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(n.text.ifBlank { n.appName }, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -678,20 +801,26 @@ private fun SmallIcon(icon: Icon?, size: Dp) {
     if (bmp != null) Image(bmp, null, modifier = Modifier.size(size))
 }
 
-/** Barrinhas de áudio animadas (paradas quando pausado). */
+/** Barrinhas de áudio: seguem o som de verdade quando o Visualizer está ligado; senão, animação. */
 @Composable
 private fun Bars(playing: Boolean, color: Color, modifier: Modifier) {
+    val real by AudioLevels.active.collectAsState()
+    val levels by AudioLevels.levels.collectAsState()
     var tick by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(playing) {
-        while (playing) {
+    LaunchedEffect(playing, real) {
+        while (playing && !real) {
             tick++
             delay(140)
         }
     }
     Row(modifier, horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
         listOf(0.45f, 0.9f, 0.6f, 0.8f).forEachIndexed { i, base ->
-            val f = if (playing) (0.3f + ((tick * (i + 2) * 37 + i * 53) % 70) / 100f) else base * 0.4f
-            val bh by animateDpAsState((f.coerceIn(0.2f, 1f) * 18).dp, tween(130), label = "bar$i")
+            val f = when {
+                !playing -> base * 0.4f
+                real -> 0.15f + levels.getOrElse(i) { 0f } * 0.85f
+                else -> 0.3f + ((tick * (i + 2) * 37 + i * 53) % 70) / 100f
+            }
+            val bh by animateDpAsState((f.coerceIn(0.12f, 1f) * 18).dp, tween(if (real) 70 else 130), label = "bar$i")
             Box(Modifier.width(3.dp).height(bh).clip(CircleShape).background(color))
         }
     }

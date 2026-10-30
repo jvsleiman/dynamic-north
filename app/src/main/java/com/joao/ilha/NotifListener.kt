@@ -111,6 +111,10 @@ class NotifListener : NotificationListenerService() {
             contentIntent = n.contentIntent,
             postedAt = sbn.postTime,
             clearable = sbn.isClearable,
+            actions = n.actions.orEmpty().mapNotNull { a ->
+                val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                NotifAction(t, a.actionIntent ?: return@mapNotNull null, a.remoteInputs?.firstOrNull { it.allowFreeFormInput })
+            }.take(3),
         )
     }
 

@@ -123,6 +123,12 @@ class IslandService : AccessibilityService() {
         scope.launch { IslandBus.media.collect { scheduleSleep() } }
         scope.launch { ui.expanded.collect { scheduleSleep() } }
         scope.launch { ui.asleep.collect { applyVisibility() } }
+        // Barrinhas que reagem ao som: o Visualizer só fica ligado enquanto a música toca.
+        scope.launch {
+            combine(IslandBus.media, Prefs.state) { m, st -> m?.playing == true && st.reactiveBars }.collect { on ->
+                if (on) AudioLevels.start(this@IslandService) else AudioLevels.stop()
+            }
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -144,6 +150,7 @@ class IslandService : AccessibilityService() {
     override fun onDestroy() {
         IslandBus.serviceRunning.value = false
         runCatching { unregisterReceiver(receiver) }
+        AudioLevels.stop()
         removeOverlay()
         scope.cancel()
         super.onDestroy()
@@ -178,6 +185,8 @@ class IslandService : AccessibilityService() {
                         onTap = { gesture(Prefs.state.value.tapGesture, tap = true) },
                         onHold = { gesture(Prefs.state.value.holdGesture, tap = false) },
                         onSwipe = ::swipe,
+                        onAction = ::runAction,
+                        onDismiss = { key -> IslandBus.dismiss?.invoke(key) },
                         onOpen = ::openPkg,
                         onCollapse = ::collapse,
                     ),
@@ -265,8 +274,10 @@ class IslandService : AccessibilityService() {
         popupJob?.cancel()
         val s = Prefs.state.value
         if (p is Popup.Notification && s.keepUntilRead) return
+        // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
+        val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
         popupJob = scope.launch {
-            delay(s.popupSeconds * 1000L)
+            delay(s.popupSeconds * 1000L + extra)
             ui.popup.value = null
             scheduleSleep()
         }
@@ -326,8 +337,15 @@ class IslandService : AccessibilityService() {
         }
     }
 
-    private fun swipe() {
+    /** [dir] > 0 deslizou para a direita. */
+    private fun swipe(dir: Float) {
         val popup = ui.popup.value
+        val media = IslandBus.media.value
+        if (popup == null && !ui.expanded.value && media != null && Prefs.state.value.swipeChangesTrack) {
+            if (dir > 0) media.controller.transportControls.skipToPrevious() else media.controller.transportControls.skipToNext()
+            vibrate()
+            return
+        }
         if (popup is Popup.Notification) {
             if (Prefs.state.value.swipeToDismiss && popup.item.clearable) IslandBus.dismiss?.invoke(popup.item.key)
             ui.popup.value = null
@@ -336,6 +354,19 @@ class IslandService : AccessibilityService() {
         } else if (ui.expanded.value) {
             collapse()
         }
+    }
+
+    private fun runAction(item: NotifItem, action: NotifAction) {
+        popupJob?.cancel()
+        ui.popup.value = null
+        if (action.remoteInput != null) {
+            IslandBus.pendingReply = PendingReply(item.title, action)
+            val i = Intent(this, ReplyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            runCatching { startActivity(i) }
+        } else {
+            runCatching { action.intent.send() }
+        }
+        collapse()
     }
 
     private fun openPkg(pkg: String?) {
@@ -397,7 +428,9 @@ class IslandService : AccessibilityService() {
 class IslandActions(
     val onTap: () -> Unit,
     val onHold: () -> Unit,
-    val onSwipe: () -> Unit,
+    val onSwipe: (Float) -> Unit,
+    val onAction: (NotifItem, NotifAction) -> Unit,
+    val onDismiss: (String) -> Unit,
     val onOpen: (String?) -> Unit,
     val onCollapse: () -> Unit,
 )
