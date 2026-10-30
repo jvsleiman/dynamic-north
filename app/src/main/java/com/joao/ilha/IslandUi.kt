@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -204,7 +205,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val popupItem = (popup as? Popup.Notification)?.item
     val actionsH = if (s.showNotifActions && popupItem?.actions?.isNotEmpty() == true) 46.dp else 0.dp
     val rows = notifs.size.coerceIn(1, s.listRows)
-    val (tw, th) = when (mode) {
+    fun sizeFor(m: Mode): Pair<Dp, Dp> = when (m) {
         Mode.Idle -> (if (idleHasContent) baseW + baseH * 2 + 12.dp else baseW) to baseH
         Mode.Asleep -> (if (s.keepMiniWhenHidden) baseH else 1.dp) to baseH
         Mode.Media, Mode.Call -> baseW + grow to baseH
@@ -227,6 +228,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedHealth -> wide to 158.dp * k * t
         Mode.ExpandedBreathe -> wide to 168.dp * k
     }
+    val (tw, th) = sizeFor(mode)
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
     val w by animateDpAsState(tw, springy, label = "w")
@@ -246,15 +248,22 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val density = LocalDensity.current
     // A janela precisa da largura total (ilha + bolinha dos dois lados).
     // Folga de 24 dp para a mola passar um pouco do tamanho final sem ser cortada.
-    val totalW = tw + 28.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
-    val targetPx = with(density) { totalW.roundToPx() }
-    // Só encolhe a janela quando a animação terminou; antes, a ilha ainda larga era espremida e "pulava".
-    val settled = abs((w - tw).value) < 0.5f
-    var reportedPx by remember { mutableIntStateOf(0) }
-    LaunchedEffect(targetPx, settled) {
-        if (targetPx > reportedPx || settled) {
-            reportedPx = targetPx
-            actions.onWidth(targetPx)
+    // Folga para a mola passar um pouco do tamanho final sem ser cortada (mais na "Saltitante").
+    val slack = if (s.motion.damping < 0.7f) 64.dp else 28.dp
+    val totalW = tw + slack + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
+    val totalH = th + 4.dp + slack
+    val targetW = with(density) { totalW.roundToPx() }
+    val targetH = with(density) { totalH.roundToPx() }
+    // A janela cresce na hora e só encolhe quando a animação terminou. Assim o Android não precisa
+    // redimensionar a janela a cada quadro (era isso que dava a "bugadinha" ao abrir e fechar).
+    val settled = abs((w - tw).value) < 0.5f && abs((h - th).value) < 0.5f
+    var reportedW by remember { mutableIntStateOf(0) }
+    var reportedH by remember { mutableIntStateOf(0) }
+    LaunchedEffect(targetW, targetH, settled) {
+        if (targetW > reportedW || targetH > reportedH || settled) {
+            reportedW = if (settled) targetW else maxOf(targetW, reportedW)
+            reportedH = if (settled) targetH else maxOf(targetH, reportedH)
+            actions.onSize(reportedW, reportedH)
         }
     }
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
@@ -285,9 +294,14 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
             ) {
                 AnimatedContent(
                     targetState = mode,
-                    transitionSpec = { fadeIn(tween(220, 90)) togetherWith fadeOut(tween(90)) },
+                    // Sem animação de tamanho própria: quem anima o tamanho é a ilha (senão as duas brigam).
+                    transitionSpec = { (fadeIn(tween(200, 70)) togetherWith fadeOut(tween(80))).using(null) },
+                    modifier = Modifier.fillMaxSize(),
                     label = "content",
                 ) { m ->
+                    // O conteúdo já nasce no tamanho final e a ilha vai revelando (nada fica espremido).
+                    val (cw, ch) = sizeFor(m)
+                    Box(Modifier.requiredSize(cw, ch)) {
                     when (m) {
                         Mode.Idle -> IdleContent(s.idleStyle, notifs, baseH, privacy)
                         Mode.Asleep -> Box(Modifier.fillMaxSize())
@@ -311,6 +325,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Live -> live?.let { CompactLive(it, baseH) }
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
                         Mode.ExpandedLive -> live?.let { ExpandedLive(it) }
+                    }
                     }
                 }
             }

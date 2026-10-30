@@ -245,7 +245,7 @@ class IslandService : AccessibilityService() {
                         onSwipe = ::swipe,
                         onAction = ::runAction,
                         onDismiss = { key -> IslandBus.dismiss?.invoke(key) },
-                        onWidth = ::setWidth,
+                        onSize = ::setSize,
                         onOpen = ::openPkg,
                         onCollapse = ::collapse,
                     ),
@@ -270,10 +270,11 @@ class IslandService : AccessibilityService() {
      * diálogo (~320 dp), o que impedia a ilha aberta de ocupar a tela toda. A interface só
      * pede para encolher depois que a animação termina.
      */
-    private fun setWidth(px: Int) {
+    private fun setSize(wPx: Int, hPx: Int) {
         val p = params ?: return
-        if (p.width != px) {
-            p.width = px
+        if (p.width != wPx || p.height != hPx) {
+            p.width = wPx
+            p.height = hPx
             view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
         }
     }
@@ -626,7 +627,7 @@ class IslandActions(
     val onSwipe: (Float) -> Unit,
     val onAction: (NotifItem, NotifAction) -> Unit,
     val onDismiss: (String) -> Unit,
-    val onWidth: (Int) -> Unit,
+    val onSize: (Int, Int) -> Unit,
     val onOpen: (String?) -> Unit,
     val onCollapse: () -> Unit,
 )
