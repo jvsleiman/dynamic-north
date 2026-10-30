@@ -650,10 +650,11 @@ private fun WidthGroup(s: Settings) {
     Group("Ilha aberta", footer = "Largura das notificações, da música e das chamadas quando a ilha abre.") {
         SwitchRow("Ocupar a largura da tela", s.fullWidth) { v -> s.set { copy(fullWidth = v) } }
         if (s.fullWidth) {
-            SliderRow("Margem dos lados", s.sideMargin, 0..32, " dp", divider = false) { v -> s.set { copy(sideMargin = v) } }
+            SliderRow("Margem dos lados", s.sideMargin, 0..32, " dp") { v -> s.set { copy(sideMargin = v) } }
         } else {
-            SliderRow("Largura máxima", s.largeMaxWidth, 260..440, " dp", divider = false) { v -> s.set { copy(largeMaxWidth = v) } }
+            SliderRow("Largura máxima", s.largeMaxWidth, 260..440, " dp") { v -> s.set { copy(largeMaxWidth = v) } }
         }
+        SliderRow("Distância da câmera ao abrir", s.largeTopGap, 0..48, " dp", divider = false) { v -> s.set { copy(largeTopGap = v) } }
     }
 }
 

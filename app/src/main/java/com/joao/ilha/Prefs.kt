@@ -65,6 +65,8 @@ data class Settings(
     val largeMaxWidth: Int = 400,
     val fullWidth: Boolean = true,
     val sideMargin: Int = 8,
+    /** Espaço entre a câmera e a ilha quando ela abre grande. */
+    val largeTopGap: Int = 14,
     val idleStyle: IdleStyle = IdleStyle.Simple,
     val bgColor: Long = 0xFF000000,
     val textColor: Long = 0xFFFFFFFF,

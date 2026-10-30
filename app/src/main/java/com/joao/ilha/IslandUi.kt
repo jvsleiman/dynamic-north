@@ -249,6 +249,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val w by animateDpAsState(tw, springy, label = "w")
     val h by animateDpAsState(th, springy, label = "h")
     val r by animateDpAsState(tr, springy, label = "r")
+    // Aberta, a ilha desce um pouco para não ficar colada na câmera.
+    val gap by animateDpAsState(if (mode.large) s.largeTopGap.dp else 0.dp, springy, label = "gap")
 
     // Segunda ilha (bolinha): a outra atividade, ou a última notificação por alguns segundos.
     val compactMain = mode == Mode.Call || mode == Mode.Live || mode == Mode.Media
@@ -278,7 +280,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val density = LocalDensity.current
     // Área de toque = ilha + bolinhas. A janela desenhada é fixa, então isso não aparece na tela.
     val touchW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
-    val touchH = th + 4.dp
+    val touchH = th + 4.dp + if (mode.large) s.largeTopGap.dp else 0.dp
     val targetW = with(density) { touchW.roundToPx() }
     val targetH = with(density) { touchH.roundToPx() }
     LaunchedEffect(targetW, targetH) { actions.onSize(targetW, targetH) }
@@ -286,7 +288,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
         // A janela desenhada ocupa a largura toda; a ilha fica no centro (ou alinhada à câmera).
         Box(Modifier.fillMaxWidth().offset { IntOffset(offsetX, 0) }, contentAlignment = Alignment.TopCenter) {
-        Row(verticalAlignment = Alignment.Top) {
+        Row(Modifier.padding(top = gap), verticalAlignment = Alignment.Top) {
             // Espaço igual do outro lado para a ilha principal continuar centralizada.
             if (hasSecond && s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))
             if (hasSecond && !s.dualOnRight) {
