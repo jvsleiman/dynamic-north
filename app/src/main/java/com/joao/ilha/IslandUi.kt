@@ -93,8 +93,8 @@ fun IslandUi(state: IslandUiState, onTap: () -> Unit, onLongPress: () -> Unit) {
     val baseH = s.height.dp
     val (tw, th, tr) = when (mode) {
         Mode.Idle -> Triple(baseW, baseH, baseH / 2)
-        Mode.Media -> Triple(baseW + 2 * baseH + 16.dp, baseH, baseH / 2)
-        Mode.Charging -> Triple(baseW + 2 * baseH + 40.dp, baseH, baseH / 2)
+        Mode.Media -> Triple(baseW + baseH * 2 + 16.dp, baseH, baseH / 2)
+        Mode.Charging -> Triple(baseW + baseH * 2 + 40.dp, baseH, baseH / 2)
         Mode.Notification, Mode.Test -> Triple(wide, 76.dp, 38.dp)
         Mode.ExpandedMedia -> Triple(wide, 196.dp, 40.dp)
         Mode.ExpandedList -> Triple(wide, 260.dp, 32.dp)
