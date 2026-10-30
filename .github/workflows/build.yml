@@ -24,7 +24,12 @@ jobs:
       - name: Compilar APK (release, sem assinatura)
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon 2>&1 | tee build.log || {
+            echo "===== ERROS ====="
+            grep -E "^e: |error:|ERROR:|What went wrong" -A2 build.log | head -80
+            exit 1
+          }
 
       - name: Separar APK e apksigner
         run: |
