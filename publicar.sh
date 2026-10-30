@@ -16,6 +16,7 @@ NAME=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2)
 cp "$T/Ilha.apk" /mnt/project-files/Ilha-android.apk
 W="$T/rel"; git worktree add -q --detach "$W"
 ( cd "$W"
+  git branch -D releases >/dev/null 2>&1 || true
   git checkout -q --orphan releases && git rm -rf -q --cached . && find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   cp "$T/Ilha.apk" "Ilha-$NAME.apk"
   python3 -c "import json,sys;print(json.dumps({'versionCode':int(sys.argv[1]),'versionName':sys.argv[2],'apk':'Ilha-'+sys.argv[2]+'.apk','notes':sys.argv[3]},ensure_ascii=False,indent=2))" "$CODE" "$NAME" "${1:-}" > version.json
