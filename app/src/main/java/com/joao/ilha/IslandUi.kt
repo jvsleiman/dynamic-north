@@ -247,7 +247,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Asleep -> (if (s.keepMiniWhenHidden) baseH else 1.dp) to baseH
         Mode.Media, Mode.Call -> baseW + grow to baseH
         Mode.Charging -> baseW + grow + 24.dp to baseH
-        Mode.Bluetooth -> baseW + grow + 48.dp to baseH
+        Mode.Bluetooth -> minOf(wide, baseW + grow + 150.dp) to maxOf(baseH, 56.dp * k)
         Mode.SmallNotif -> minOf(wide, baseW + grow + 120.dp) to baseH
         Mode.Notification -> wide to 78.dp * k * t + actionsH +
             (if (thread) ThreadRow * t * (popupItem?.messages?.size ?: 0).coerceIn(1, 6) + 8.dp else 0.dp)
@@ -764,21 +764,25 @@ private fun BatteryGlyph(level: Int, color: Color, modifier: Modifier, h: Dp) {
 
 @Composable
 private fun CompactBluetooth(b: BluetoothInfo, h: Dp) {
+    // Fone conectado: ícone grande à esquerda, nome e "Conectado" no meio, bateria à direita.
     val col = LocalIslandColors.current
-    Row(
-        Modifier.fillMaxSize().padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-            Icon(btIcon(b.kind), null, tint = if (b.connected) Color(0xFF0A84FF) else col.dim, modifier = Modifier.size(h - 14.dp))
-            Spacer(Modifier.width(6.dp))
+    val ic = LocalIconScale.current
+    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(btIcon(b.kind), null, tint = if (b.connected) col.text else col.dim, modifier = Modifier.size(30.dp * ic))
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(b.name, color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (b.connected) b.name else "Desconectado",
-                color = col.text, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                if (b.connected) "Conectado" else "Desconectado",
+                color = if (b.connected) Green else col.dim, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1,
             )
         }
-        if (b.battery != null) Text("${b.battery}%", color = Green, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        if (b.connected && b.battery != null) {
+            Spacer(Modifier.width(8.dp))
+            Icon(btIcon(b.kind), null, tint = col.dim, modifier = Modifier.size(12.dp))
+            Spacer(Modifier.width(3.dp))
+            Text("${b.battery}%", color = if (b.battery <= 20) Color(0xFFFF453A) else col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

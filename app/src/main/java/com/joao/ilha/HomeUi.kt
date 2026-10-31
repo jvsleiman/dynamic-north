@@ -53,8 +53,8 @@ private val CalColor = Color(0xFFFF453A)
 
 /** Altura da ilha principal conforme o que ela mostra. */
 internal fun homeHeight(s: Settings, weather: WeatherInfo?, agenda: AgendaInfo?): Dp {
-    var h = 92.dp + 44.dp
-    if (s.homeWeather && weather != null && weather.hours.isNotEmpty()) h += 70.dp
+    var h = 80.dp + 44.dp
+    if (s.homeWeather && weather != null) h += weatherCardHeight(weather) + 12.dp
     if (s.homeHealth) h += 58.dp
     if (s.homeAgenda && agenda != null) h += 56.dp + (if (agenda.next != null) 26.dp else 0.dp)
     return h
@@ -78,39 +78,20 @@ internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
         }
     }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
-        // Hora, data e clima agora
-        Row(Modifier.fillMaxWidth().height(68.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Hora e data
+        Row(Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(SimpleDateFormat("HH:mm", BR).format(Date(now)), color = col.text, fontSize = 40.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(SimpleDateFormat("HH:mm", BR).format(Date(now)), color = col.text, fontSize = 34.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                 Text(
                     SimpleDateFormat("EEEE, d 'de' MMMM", BR).format(Date(now)).replaceFirstChar { it.uppercase() },
                     color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
-            val w = weather
-            if (s.homeWeather && w != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(weatherIcon(w.code, w.day), null, tint = col.text, modifier = Modifier.size(30.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("${w.temp}°", color = col.text, fontSize = 26.sp, fontWeight = FontWeight.Medium)
-                    }
-                    Text(weatherLabel(w.code), color = col.dim, fontSize = 11.sp, maxLines = 1)
-                }
-            }
         }
         Spacer(Modifier.height(12.dp))
-        // Próximas horas
-        weather?.takeIf { s.homeWeather && it.hours.isNotEmpty() }?.let { w ->
-            Row(Modifier.fillMaxWidth().height(58.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                w.hours.forEach { h ->
-                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                        Text("%02d:00".format(h.hour), color = col.dim, fontSize = 11.sp)
-                        Icon(weatherIcon(h.code, h.day), null, tint = col.text, modifier = Modifier.size(22.dp))
-                        Text("${h.temp}°", color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+        // Clima: cartão com fundo animado do tempo de agora, temperatura e as próximas horas
+        weather?.takeIf { s.homeWeather }?.let { w ->
+            WeatherCard(w)
             Spacer(Modifier.height(12.dp))
         }
         // Saúde
@@ -254,4 +235,35 @@ internal fun WeatherAgendaIdleRight(style: IdleStyle, now: Long) {
         else -> ""
     }
     Text(text, color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+}
+
+internal fun weatherCardHeight(w: WeatherInfo): Dp = if (w.hours.isNotEmpty()) 118.dp else 64.dp
+
+@Composable
+private fun WeatherCard(w: WeatherInfo) {
+    val shadow = androidx.compose.ui.text.TextStyle(shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.35f), androidx.compose.ui.geometry.Offset(0f, 1.5f), 4f))
+    Box(Modifier.fillMaxWidth().height(weatherCardHeight(w)).clip(RoundedCornerShape(20.dp))) {
+        WeatherBackdrop(w.code, w.day, Modifier.fillMaxSize())
+        Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Row(Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(weatherIcon(w.code, w.day), null, tint = Color.White, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("${w.temp}°", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.SemiBold, style = shadow)
+                Spacer(Modifier.width(10.dp))
+                Text(weatherLabel(w.code), color = Color.White.copy(alpha = 0.9f), fontSize = 13.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, style = shadow)
+            }
+            if (w.hours.isNotEmpty()) {
+                Spacer(Modifier.weight(1f))
+                Row(Modifier.fillMaxWidth().height(52.dp)) {
+                    w.hours.forEach { h ->
+                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+                            Text("%02d:00".format(h.hour), color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp, style = shadow)
+                            Icon(weatherIcon(h.code, h.day), null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Text("${h.temp}°", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, style = shadow)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

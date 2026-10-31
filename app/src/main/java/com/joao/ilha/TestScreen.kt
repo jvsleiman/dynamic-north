@@ -218,6 +218,18 @@ object Demo {
         Weather.now.value = WeatherInfo(28, 2, true, listOf(HourForecast(11, 2, 29, true), HourForecast(12, 61, 30, true), HourForecast(13, 63, 31, true), HourForecast(14, 2, 29, true)), System.currentTimeMillis())
     }
 
+    private val skies = listOf(0 to true, 0 to false, 2 to true, 3 to true, 45 to true, 61 to true, 71 to true, 95 to false)
+    private var sky = 0
+
+    /** Mostra a ilha principal com o próximo tipo de tempo (sol, noite, nuvens, neblina, chuva, neve, tempestade). */
+    fun nextSky() {
+        val (code, day) = skies[sky % skies.size]
+        sky++
+        val base = Weather.now.value
+        Weather.now.value = WeatherInfo(base?.temp ?: 24, code, day, base?.hours?.takeIf { it.isNotEmpty() }
+            ?: listOf(HourForecast(11, 2, 25, true), HourForecast(12, 61, 26, true), HourForecast(13, 3, 26, true), HourForecast(14, 0, 27, true)), base?.at ?: 0L)
+    }
+
     fun endCall() {
         IslandBus.call.value = null
         IslandBus.refresh?.invoke()
@@ -366,6 +378,7 @@ fun TestScreen(back: () -> Unit) {
         }
         Group("Ilha aberta", footer = "Abre a ilha grande direto no layout escolhido.") {
             NavRow("Ilha principal") { Demo.weather(); IslandBus.expand?.invoke(ExpandKind.Home) }
+            NavRow("Ilha principal: trocar o tempo") { Demo.nextSky(); IslandBus.expand?.invoke(ExpandKind.Home) }
             NavRow("Controles rápidos", icon = Icons.Rounded.Tune, iconColor = Color(0xFF0A84FF)) { IslandBus.expand?.invoke(ExpandKind.Controls) }
             NavRow("Relógio") { IslandBus.expand?.invoke(ExpandKind.Clock) }
             NavRow("Bateria") { IslandBus.expand?.invoke(ExpandKind.Battery) }

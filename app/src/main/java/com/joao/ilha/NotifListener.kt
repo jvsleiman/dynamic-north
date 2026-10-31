@@ -100,7 +100,7 @@ class NotifListener : NotificationListenerService() {
         IslandBus.live.value = list
             .mapNotNull { sbn -> liveKind(sbn)?.let { sbn to it } }
             // Alarme tocando tem prioridade; depois navegação; depois timers.
-            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress }, { -it.first.postTime }))
+            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress }, { it.first.key != lastProgress?.key }, { -it.first.postTime }))
             .firstOrNull()
             ?.let { (sbn, kind) -> toLive(sbn, kind) }
         watchDone(IslandBus.live.value)
@@ -138,18 +138,31 @@ class NotifListener : NotificationListenerService() {
             clockApp && chrono -> LiveKind.Stopwatch
             // Download, envio ou instalação com barra de progresso.
             !clockApp && ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0 && !ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) -> LiveKind.Progress
+            // Fase sem porcentagem (preparando, verificando, instalando): continua na ilha, com o anel girando.
+            !clockApp && ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) &&
+                (sbn.key == lastProgress?.key || progressWords.any { it in words }) -> LiveKind.Progress
             else -> null
         }
     }
 
     private var lastProgress: LiveInfo? = null
+    private var maxSeen = 0f
+    private val progressWords = listOf("baixando", "download", "instalando", "installing", "enviando", "upload", "atualizando", "updating", "verificando", "pendente", "pending")
 
-    /** Download que sumiu ou chegou ao fim perto de 100%: avisa "Concluído". */
+    /**
+     * "Concluído" só quando o download que estava na ilha chega a 100% ou some depois de ter passado de 90%
+     * (a Play Store tira a notificação quando termina de instalar).
+     */
     private fun watchDone(now: LiveInfo?) {
         val prev = lastProgress
-        lastProgress = now?.takeIf { it.kind == LiveKind.Progress && it.progress < 1f }
+        val cur = now?.takeIf { it.kind == LiveKind.Progress && it.progress < 1f }
+        if (cur != null && cur.key != prev?.key) maxSeen = 0f
+        if (cur != null) maxSeen = maxOf(maxSeen, cur.progress)
+        lastProgress = cur
         if (prev == null) return
-        val finished = (now?.key == prev.key && now.progress >= 1f) || (now?.key != prev.key && prev.progress >= 0.9f)
+        val stillThere = runCatching { activeNotifications.any { it.key == prev.key } }.getOrDefault(false)
+        val finished = (now?.key == prev.key && now.progress >= 1f) || (now?.key != prev.key && !stillThere && maxSeen >= 0.9f)
+        if (now?.key != prev.key && !stillThere && cur == null) maxSeen = 0f
         if (finished) IslandBus.show(Popup.Done(prev.title, prev.appName, prev.smallIcon, prev.color))
     }
 

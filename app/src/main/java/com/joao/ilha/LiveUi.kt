@@ -51,7 +51,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -196,12 +198,27 @@ private fun AppGlyph(l: LiveInfo, size: Dp) {
 
 @Composable
 internal fun ProgressRing(progress: Float, color: Color, size: Dp, stroke: Dp, done: Boolean = false) {
-    val shown by animateFloatAsState(progress.coerceIn(0f, 1f), tween(400), label = "ring")
+    // Sem porcentagem (preparando/instalando): um arco girando.
+    val indeterminate = progress < 0f && !done
+    // O sistema atualiza a barra mais ou menos a cada segundo: o anel anda contínuo até o novo valor.
+    // Se o valor voltar (outro arquivo), pula direto em vez de girar para trás.
+    val target = progress.coerceIn(0f, 1f)
+    val anim = remember { androidx.compose.animation.core.Animatable(target) }
+    LaunchedEffect(target) {
+        if (target < anim.value - 0.02f) anim.snapTo(target) else anim.animateTo(target, tween(900, easing = androidx.compose.animation.core.LinearEasing))
+    }
+    var spin by remember { mutableFloatStateOf(0f) }
+    if (indeterminate) LaunchedEffect(Unit) {
+        val start = withFrameMillis { it }
+        while (true) withFrameMillis { spin = ((it - start) % 1000L) / 1000f * 360f }
+    }
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val w = stroke.toPx()
             drawCircle(color.copy(alpha = 0.25f), radius = (this.size.minDimension - w) / 2, style = Stroke(w))
-            drawArc(color, -90f, 360f * (if (done) 1f else shown), false, topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w), style = Stroke(w, cap = StrokeCap.Round))
+            val start = if (indeterminate) spin - 90f else -90f
+            val sweep = if (done) 360f else if (indeterminate) 90f else 360f * anim.value
+            drawArc(color, start, sweep, false, topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w), style = Stroke(w, cap = StrokeCap.Round))
         }
         if (done) Icon(Icons.Rounded.Check, null, tint = color, modifier = Modifier.size(size * 0.6f))
     }
@@ -352,11 +369,13 @@ private fun ExpandedProgress(l: LiveInfo) {
         Column(Modifier.weight(1f)) {
             Text(l.appName.ifBlank { "Baixando" }, color = col.dim, fontSize = 12.sp, maxLines = 1)
             Text(l.title.ifBlank { l.text }, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Texto do próprio sistema ("45 MB de 100 MB", "Instalando…").
+            if (l.title.isNotBlank() && l.text.isNotBlank()) Text(l.text, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
         Box(contentAlignment = Alignment.Center) {
             ProgressRing(l.progress, CamColor, 46.dp, 3.5.dp)
-            Text("${(l.progress.coerceIn(0f, 1f) * 100).toInt()}%", color = col.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            if (l.progress >= 0f) Text("${(l.progress.coerceIn(0f, 1f) * 100).toInt()}%", color = col.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
