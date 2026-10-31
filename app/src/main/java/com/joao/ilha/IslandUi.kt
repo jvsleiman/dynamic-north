@@ -246,11 +246,16 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val (tw, th) = sizeFor(mode)
     val tr = if (mode.large) s.largeRadius.dp else smallR
     val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
-    val w by animateDpAsState(tw, springy, label = "w")
-    val h by animateDpAsState(th, springy, label = "h")
-    val r by animateDpAsState(tr, springy, label = "r")
+    // A mola passa um pouco do valor final; nada aqui pode ficar negativo (o Compose fecha o app).
+    val wAnim by animateDpAsState(tw, springy, label = "w")
+    val hAnim by animateDpAsState(th, springy, label = "h")
+    val rAnim by animateDpAsState(tr, springy, label = "r")
+    val w = wAnim.coerceAtLeast(1.dp)
+    val h = hAnim.coerceAtLeast(1.dp)
+    val r = rAnim.coerceAtLeast(0.dp)
     // Aberta, a ilha desce um pouco para não ficar colada na câmera.
-    val gap by animateDpAsState(if (mode.large) s.largeTopGap.dp else 0.dp, springy, label = "gap")
+    val gapAnim by animateDpAsState(if (mode.large) s.largeTopGap.dp else 0.dp, springy, label = "gap")
+    val gap = gapAnim.coerceAtLeast(0.dp)
 
     // Segunda ilha (bolinha): a outra atividade, ou a última notificação por alguns segundos.
     val compactMain = mode == Mode.Call || mode == Mode.Live || mode == Mode.Media

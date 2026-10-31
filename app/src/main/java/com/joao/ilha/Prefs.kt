@@ -156,6 +156,7 @@ object Prefs {
     fun init(context: Context) {
         if (::sp.isInitialized) return
         sp = context.applicationContext.getSharedPreferences("ilha", Context.MODE_PRIVATE)
+        CrashLog.install(context.applicationContext)
         _state.value = sp.getString("settings", null)
             ?.let { runCatching { json.decodeFromString<Settings>(it) }.getOrNull() }
             ?: Settings()
@@ -180,5 +181,33 @@ object Prefs {
             motion = d.motion,
             textScale = d.textScale, iconScale = d.iconScale, layoutScale = d.layoutScale, listRows = d.listRows,
         )
+    }
+}
+
+/** Guarda o último erro que fechou o app, para mostrar em Ajuda e facilitar a correção. */
+object CrashLog {
+    private const val FILE = "ultimo-erro.txt"
+
+    fun install(ctx: Context) {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        if (previous is Handler) return
+        Thread.setDefaultUncaughtExceptionHandler(Handler(ctx, previous))
+    }
+
+    fun read(ctx: Context): String? = runCatching { java.io.File(ctx.filesDir, FILE).readText() }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    fun clear(ctx: Context) {
+        runCatching { java.io.File(ctx.filesDir, FILE).delete() }
+    }
+
+    private class Handler(val ctx: Context, val previous: Thread.UncaughtExceptionHandler?) : Thread.UncaughtExceptionHandler {
+        override fun uncaughtException(t: Thread, e: Throwable) {
+            runCatching {
+                val when_ = java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                val info = "Ilha ${BuildConfig.VERSION_NAME} · Android ${android.os.Build.VERSION.RELEASE} · ${android.os.Build.MODEL} · $when_\n"
+                java.io.File(ctx.filesDir, FILE).writeText(info + e.stackTraceToString().take(6000))
+            }
+            previous?.uncaughtException(t, e)
+        }
     }
 }

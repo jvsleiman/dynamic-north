@@ -130,6 +130,11 @@ fun HomeScreen(go: (Screen) -> Unit) {
                 }
             }
         }
+        if (remember { CrashLog.read(ctx) } != null) {
+            Group {
+                NavRow("O app fechou sozinho: ver o erro", icon = Icons.AutoMirrored.Rounded.HelpOutline, iconColor = Color(0xFFFF3B30), divider = false) { go(Screen.Help) }
+            }
+        }
         Group {
             SwitchRow("Barra da Ilha", s.enabled) { v -> s.set { copy(enabled = v) } }
             NavRow("Exibição") { go(Screen.Display) }
@@ -557,7 +562,23 @@ fun UpdateScreen(back: () -> Unit) {
 
 @Composable
 fun HelpScreen(back: () -> Unit) {
+    val ctx = LocalContext.current
+    var crash by remember { mutableStateOf(CrashLog.read(ctx)) }
     Page("Ajuda", back) {
+        crash?.let { log ->
+            Group("O app fechou sozinho", footer = "Toque em Copiar e cole a mensagem na conversa para eu corrigir.") {
+                InfoText(log.lineSequence().take(4).joinToString("\n"))
+                NavRow("Copiar relatório do erro") {
+                    val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Erro do Ilha", log))
+                    android.widget.Toast.makeText(ctx, "Copiado", android.widget.Toast.LENGTH_SHORT).show()
+                }
+                NavRow("Apagar", divider = false) {
+                    CrashLog.clear(ctx)
+                    crash = null
+                }
+            }
+        }
         Group("A ilha some sozinha?") {
             InfoText("Alguns celulares (Motorola, Xiaomi, Samsung) fecham apps em segundo plano. Em Informações do app → Bateria, escolha \"Sem restrição\" e, se existir, ative a inicialização automática.")
         }

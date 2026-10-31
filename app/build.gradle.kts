@@ -20,8 +20,8 @@ android {
         applicationId = "com.joao.ilha"
         minSdk = 26
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.9.2"
+        versionCode = 12
+        versionName = "0.9.3"
     }
 
     signingConfigs {
@@ -54,6 +54,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
