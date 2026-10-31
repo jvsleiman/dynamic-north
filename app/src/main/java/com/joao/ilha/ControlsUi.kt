@@ -1,5 +1,8 @@
 package com.joao.ilha
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.rounded.LockOpen
+import androidx.compose.material.icons.rounded.DoNotDisturbOff
 import android.app.NotificationManager
 import android.bluetooth.BluetoothManager
 import android.content.Context
@@ -289,6 +292,25 @@ internal fun VolumePopup(level: Int, max: Int, ring: Boolean, h: Dp) {
         }
         Spacer(Modifier.width(10.dp))
         Text("${(f * 100).roundToInt()}", color = col.text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Aviso curto do sistema: ícone na esquerda, texto na direita, como no iPhone. */
+@Composable
+internal fun StatusPopup(kind: StatusKind, h: Dp) {
+    val col = LocalIslandColors.current
+    val (icon, label, tint) = when (kind) {
+        StatusKind.Ring -> Triple(Icons.Rounded.NotificationsActive, "Som", col.text)
+        StatusKind.Vibrate -> Triple(Icons.Rounded.Vibration, "Vibrar", col.text)
+        StatusKind.Silent -> Triple(Icons.Rounded.NotificationsOff, "Silencioso", Color(0xFFFF453A))
+        StatusKind.DndOn -> Triple(Icons.Rounded.DoNotDisturbOn, "Não perturbe", Color(0xFF5E5CE6))
+        StatusKind.DndOff -> Triple(Icons.Rounded.DoNotDisturbOff, "Não perturbe desligado", col.dim)
+        StatusKind.Unlocked -> Triple(Icons.Rounded.LockOpen, "", col.text)
+    }
+    Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(h * 0.5f))
+        Spacer(Modifier.weight(1f))
+        if (label.isNotEmpty()) Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

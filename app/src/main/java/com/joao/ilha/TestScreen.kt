@@ -256,6 +256,7 @@ fun TestScreen(back: () -> Unit) {
                         3_500L to { Demo.stopLive(); IslandBus.show(Popup.Charging(ChargingInfo(72, true))) },
                         3_500L to { IslandBus.show(Popup.Bluetooth(BluetoothInfo("Fones de ouvido", BtKind.Earbuds, true, 80))) },
                         3_500L to { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) },
+                        2_500L to { IslandBus.show(Popup.Status(StatusKind.Silent)) },
                         3_500L to { Demo.privacy(true); Demo.privacy(false) },
                     )
                     try {
@@ -295,6 +296,9 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Bateria cheia") { IslandBus.show(Popup.Reminder(ReminderKind.BatteryFull)) }
             NavRow("Fone Bluetooth conectado", icon = Icons.Rounded.Bluetooth, iconColor = Accent) { IslandBus.show(Popup.Bluetooth(BluetoothInfo("Fones de ouvido", BtKind.Earbuds, true, 80))) }
             NavRow("Volume", icon = Icons.AutoMirrored.Rounded.VolumeUp, iconColor = Color(0xFF8E8E93)) { IslandBus.show(Popup.Volume(9, 15, false)) }
+            NavRow("Modo silencioso") { IslandBus.show(Popup.Status(StatusKind.Silent)) }
+            NavRow("Não perturbe") { IslandBus.show(Popup.Status(StatusKind.DndOn)) }
+            NavRow("Desbloqueio") { IslandBus.show(Popup.Status(StatusKind.Unlocked)) }
             NavRow("Câmera em uso") { Demo.privacy(true) }
             NavRow("Microfone em uso") { Demo.privacy(false) }
             NavRow("Aviso de teste", divider = false) { IslandBus.show(Popup.Test) }

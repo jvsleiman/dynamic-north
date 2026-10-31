@@ -142,7 +142,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
-    Volume(false), ExpandedControls(true),
+    Volume(false), ExpandedControls(true), Status(false),
 }
 
 @Composable
@@ -196,6 +196,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Test -> Mode.Test
         popup is Popup.Reminder -> Mode.Reminder
         popup is Popup.Volume -> Mode.Volume
+        popup is Popup.Status -> Mode.Status
         main == Act.Call -> Mode.Call
         main == Act.Live -> Mode.Live
         main == Act.Media -> Mode.Media
@@ -250,6 +251,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedSystem -> wide to 150.dp * k * t
         Mode.Reminder -> wide to 78.dp * k * t
         Mode.Volume -> baseW + grow + 90.dp to baseH
+        Mode.Status -> baseW + grow + 96.dp to baseH
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + (if (live?.kind == LiveKind.Navigation) 64.dp else 28.dp) to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
@@ -407,6 +409,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.ExpandedBreathe -> BreatheCard()
                         Mode.Live -> live?.let { CompactLive(it, baseH) }
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
+                        Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
                         Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
                         Mode.ExpandedLive -> live?.let { ExpandedLive(it) }

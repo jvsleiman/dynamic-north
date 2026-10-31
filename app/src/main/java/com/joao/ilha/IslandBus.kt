@@ -81,6 +81,8 @@ enum class BtKind { Earbuds, Headphones, Watch, Speaker, Other }
 
 data class BluetoothInfo(val name: String, val kind: BtKind, val connected: Boolean, val battery: Int?)
 
+enum class StatusKind { Ring, Vibrate, Silent, DndOn, DndOff, Unlocked }
+
 enum class ReminderKind { Break, Water, Bedtime, BatteryLow, BatteryFull }
 
 /** Avisos rápidos que aparecem e somem sozinhos. */
@@ -91,6 +93,8 @@ sealed interface Popup {
     data object Test : Popup
     data class Reminder(val kind: ReminderKind) : Popup
     data class Volume(val level: Int, val max: Int, val ring: Boolean) : Popup
+    /** Aviso curto do sistema: modo silencioso, Não perturbe, desbloqueio. */
+    data class Status(val kind: StatusKind) : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */

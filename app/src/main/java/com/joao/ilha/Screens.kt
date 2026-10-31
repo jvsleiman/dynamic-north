@@ -773,7 +773,11 @@ fun LiveScreen(back: () -> Unit) {
         ) {
             SwitchRow("Timer e cronômetro", s.liveEnabled, subtitle = "O tempo conta ao vivo na ilha") { v -> s.set { copy(liveEnabled = v) } }
             SwitchRow("Alarme tocando", s.alarmEnabled, subtitle = "Ilha grande com soneca e parar") { v -> s.set { copy(alarmEnabled = v) } }
-            SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = false) { v -> s.set { copy(navEnabled = v) } }
+            SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = !s.navEnabled) { v -> s.set { copy(navEnabled = v) } }
+            if (s.navEnabled) SwitchRow("Abrir a cada nova instrução", s.navAutoExpand, subtitle = "A ilha cresce por 3 segundos quando muda a próxima curva", divider = false) { v -> s.set { copy(navAutoExpand = v) } }
+        }
+        Group(footer = "Aparecem por um instante quando você muda o modo da campainha, liga ou desliga o Não perturbe ou desbloqueia o celular.") {
+            SwitchRow("Avisos do sistema", s.statusAlerts, divider = false) { v -> s.set { copy(statusAlerts = v) } }
         }
         Group(footer = "O Notch não grava nada: só mostra o tempo enquanto o gravador do celular estiver gravando.") {
             SwitchRow("Gravação de tela e de voz", s.recorderEnabled) { v -> s.set { copy(recorderEnabled = v) } }

@@ -80,6 +80,10 @@ class IslandService : AccessibilityService() {
     private val locked = MutableStateFlow(false)
     private var lastBt: BluetoothInfo? = null
 
+    private var lastDnd = false
+    private var lastDndChange = 0L
+    private var lastNavTitle: String? = null
+
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             val s = Prefs.state.value
@@ -100,6 +104,24 @@ class IslandService : AccessibilityService() {
                 Intent.ACTION_USER_PRESENT -> {
                     locked.value = false
                     Health.screenOn()
+                    if (s.statusAlerts) show(Popup.Status(StatusKind.Unlocked), haptic = false)
+                }
+                AudioManager.RINGER_MODE_CHANGED_ACTION -> if (s.statusAlerts && !isInitialStickyBroadcast) {
+                    val kind = when (i.getIntExtra(AudioManager.EXTRA_RINGER_MODE, AudioManager.RINGER_MODE_NORMAL)) {
+                        AudioManager.RINGER_MODE_SILENT -> StatusKind.Silent
+                        AudioManager.RINGER_MODE_VIBRATE -> StatusKind.Vibrate
+                        else -> StatusKind.Ring
+                    }
+                    // O Não perturbe também muda o modo da campainha; não mostra os dois avisos juntos.
+                    if (System.currentTimeMillis() - lastDndChange > 1500) show(Popup.Status(kind), haptic = false)
+                }
+                android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> if (s.statusAlerts) {
+                    val on = dndActive()
+                    if (on != lastDnd) {
+                        lastDnd = on
+                        lastDndChange = System.currentTimeMillis()
+                        show(Popup.Status(if (on) StatusKind.DndOn else StatusKind.DndOff), haptic = false)
+                    }
                 }
                 BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (s.bluetoothEnabled) {
                     val d = device(i) ?: return
@@ -144,9 +166,12 @@ class IslandService : AccessibilityService() {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction(ACTION_BT_BATTERY)
+            addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+            addAction(android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
         addOverlay()
+        lastDnd = dndActive()
         Health.init(this)
         watchPrivacy()
         if (!locked.value) Health.screenOn()
@@ -170,6 +195,7 @@ class IslandService : AccessibilityService() {
             IslandBus.live.collect { l ->
                 if (l == null && ui.expanded.value && ui.expandKind.value == ExpandKind.Live) ui.expanded.value = false
                 if (l?.kind == LiveKind.Alarm) ui.popup.value = null
+                navStep(l)
                 scheduleSleep()
             }
         }
@@ -414,7 +440,7 @@ class IslandService : AccessibilityService() {
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
-        val duration = if (p is Popup.Volume) 1_600L else s.popupSeconds * 1000L + extra
+        val duration = if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
             delay(duration)
             ui.popup.value = null
@@ -423,6 +449,22 @@ class IslandService : AccessibilityService() {
     }
 
     // ---------- Não perturbe e modo de jogo ----------
+
+    /** Navegação mudou de instrução (nova curva): abre a ilha por um instante, como no iPhone. */
+    private fun navStep(l: LiveInfo?) {
+        val title = l?.takeIf { it.kind == LiveKind.Navigation }?.text
+        val changed = title != null && lastNavTitle != null && title != lastNavTitle
+        lastNavTitle = title
+        if (!changed || !Prefs.state.value.navAutoExpand) return
+        if (ui.expanded.value || ui.popup.value != null || IslandBus.call.value != null || locked.value) return
+        ui.expandKind.value = ExpandKind.Live
+        ui.expanded.value = true
+        popupJob?.cancel()
+        popupJob = scope.launch {
+            delay(3_000)
+            if (ui.expandKind.value == ExpandKind.Live) collapse()
+        }
+    }
 
     private fun dndActive(): Boolean =
         (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager).currentInterruptionFilter > android.app.NotificationManager.INTERRUPTION_FILTER_ALL

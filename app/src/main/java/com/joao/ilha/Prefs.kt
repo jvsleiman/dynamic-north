@@ -133,6 +133,10 @@ data class Settings(
     val gameMode: Boolean = true,
     val respectDnd: Boolean = true,
     val recorderEnabled: Boolean = true,
+    /** Avisos curtos do sistema (silencioso, Não perturbe, desbloqueio). */
+    val statusAlerts: Boolean = true,
+    /** Navegação: a ilha abre sozinha por um instante quando muda a próxima instrução. */
+    val navAutoExpand: Boolean = true,
     /** Ajuste fino do tempo da gravação/cronômetro (ms; positivo adianta). */
     val liveOffsetMs: Int = 0,
 
