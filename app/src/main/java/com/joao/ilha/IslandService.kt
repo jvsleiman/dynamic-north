@@ -83,6 +83,7 @@ class IslandService : AccessibilityService() {
     private var lastDnd = false
     private var lastDndChange = 0L
     private var lastNavTitle: String? = null
+    private var lastLiveKey: String? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
@@ -178,6 +179,7 @@ class IslandService : AccessibilityService() {
         scope.launch { IslandBus.popups.collect { show(it) } }
         scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
+        scope.launch { combine(IslandBus.call, IslandBus.live, IslandBus.media) { _, _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
         scope.launch {
             IslandBus.call.collect { c ->
@@ -231,6 +233,7 @@ class IslandService : AccessibilityService() {
         }
         if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         if (Build.VERSION.SDK_INT >= 26 && windows.any { it.isInPictureInPictureMode && it.root?.packageName?.toString() == event.packageName?.toString() }) return
+        if (isSmallWindowApp(event.packageName?.toString())) return
         val pkg = event.packageName?.toString() ?: return
         if (ignoredPkg(pkg)) return
         foregroundPkg.value = pkg
@@ -242,13 +245,27 @@ class IslandService : AccessibilityService() {
 
     /** App em tela cheia de verdade: a janela de app ativa que não está em PiP. */
     private fun mainAppFromWindows(): String? = runCatching {
+        val screen = resources.displayMetrics.let { it.widthPixels.toLong() * it.heightPixels }
+        val r = android.graphics.Rect()
         val apps = windows.filter { w ->
-            w.type == AccessibilityWindowInfo.TYPE_APPLICATION && !(Build.VERSION.SDK_INT >= 26 && w.isInPictureInPictureMode)
+            w.getBoundsInScreen(r)
+            // Alguns celulares não marcam a janelinha como PiP: janela pequena também não conta.
+            w.type == AccessibilityWindowInfo.TYPE_APPLICATION && !(Build.VERSION.SDK_INT >= 26 && w.isInPictureInPictureMode) &&
+                r.width().toLong() * r.height() > screen * 0.4
         }
         val main = apps.firstOrNull { it.isActive || it.isFocused } ?: apps.firstOrNull()
         val pkg = main?.root?.packageName?.toString()
         pkg?.takeUnless { ignoredPkg(it) }
     }.getOrNull()
+
+    /** O app só tem uma janela pequena na tela (janelinha de vídeo, mesmo sem a marca de PiP). */
+    private fun isSmallWindowApp(pkg: String?): Boolean = runCatching {
+        if (pkg == null) return false
+        val screen = resources.displayMetrics.let { it.widthPixels.toLong() * it.heightPixels }
+        val r = android.graphics.Rect()
+        val mine = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName?.toString() == pkg }
+        mine.isNotEmpty() && mine.all { w -> w.getBoundsInScreen(r); r.width().toLong() * r.height() <= screen * 0.4 }
+    }.getOrDefault(false)
 
     override fun onInterrupt() {}
 
@@ -378,11 +395,14 @@ class IslandService : AccessibilityService() {
         val s = Prefs.state.value
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val hasCall = IslandBus.call.value != null
+        // Atividade reconhecida (rota, timer, música tocando, download…) sempre aparece,
+        // mesmo com vídeo em janelinha, app escondido ou modo de jogo.
+        val hasActivity = hasCall || IslandBus.live.value != null || IslandBus.media.value?.playing == true
         val visible = s.enabled &&
-            !(landscape && !s.showInLandscape) &&
+            !(landscape && !s.showInLandscape && !hasCall) &&
             !(locked.value && s.hideOnLockscreen && !hasCall) &&
-            (foregroundPkg.value !in s.hiddenApps || hasCall) &&
-            (!inGame() || hasCall)
+            (foregroundPkg.value !in s.hiddenApps || hasActivity) &&
+            (!inGame() || hasActivity)
         val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
         v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
         val t = touch ?: return
@@ -465,7 +485,10 @@ class IslandService : AccessibilityService() {
         val title = l?.takeIf { it.kind == LiveKind.Navigation }?.text
         val changed = title != null && lastNavTitle != null && title != lastNavTitle
         lastNavTitle = title
-        if (!changed || !Prefs.state.value.navAutoExpand) return
+        // Atividade nova (rota começou, timer, download, corrida…) também abre por um instante.
+        val started = l != null && l.key != lastLiveKey && l.kind != LiveKind.Alarm
+        lastLiveKey = l?.key
+        if (!(changed && Prefs.state.value.navAutoExpand) && !started) return
         if (ui.expanded.value || ui.popup.value != null || IslandBus.call.value != null || locked.value) return
         ui.expandKind.value = ExpandKind.Live
         ui.expanded.value = true
