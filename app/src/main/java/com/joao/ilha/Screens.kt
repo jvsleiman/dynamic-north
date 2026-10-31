@@ -108,12 +108,14 @@ fun HomeScreen(go: (Screen) -> Unit) {
     val ctx = LocalContext.current
     val s by Prefs.state.collectAsState()
     var a11y by remember { mutableStateOf(a11yEnabled(ctx)) }
+    var a11yShortcut by remember { mutableStateOf(a11yShortcutOn(ctx)) }
     var listener by remember { mutableStateOf(listenerEnabled(ctx)) }
     val lifecycle = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             a11y = a11yEnabled(ctx)
             listener = listenerEnabled(ctx)
+            a11yShortcut = a11yShortcutOn(ctx)
         }
     }
     Page("Ilha", onBack = null) {
@@ -130,6 +132,11 @@ fun HomeScreen(go: (Screen) -> Unit) {
                 NavRow("Informações do app", divider = false) {
                     runCatching { ctx.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))) }
                 }
+            }
+        }
+        if (a11y && a11yShortcut) {
+            Group(footer = "É o atalho de acessibilidade do Android, não faz parte da ilha. Na tela que abrir, desligue \"Atalho do Ilha\" e deixe só \"Usar Ilha\" ligado.") {
+                NavRow("Tirar o botão flutuante da lateral", icon = Icons.Rounded.PhoneIphone, iconColor = Color(0xFFFF9500), divider = false) { openA11yDetails(ctx) }
             }
         }
         if (remember { CrashLog.read(ctx) } != null) {
@@ -578,6 +585,10 @@ fun HelpScreen(back: () -> Unit) {
         Group("A ilha some sozinha?") {
             InfoText("Alguns celulares (Motorola, Xiaomi, Samsung) fecham apps em segundo plano. Em Informações do app → Bateria, escolha \"Sem restrição\" e, se existir, ative a inicialização automática.")
         }
+        Group("Apareceu um ícone do Ilha na lateral da tela") {
+            InfoText("É o botão de atalho da acessibilidade do Android, que alguns celulares ligam junto com o serviço. Ele não é a ilha e pode ser desligado sem afetar nada: na tela abaixo, desligue \"Atalho do Ilha\" (ou \"Botão de acessibilidade\") e deixe só \"Usar Ilha\" ligado.")
+            NavRow("Abrir ajuste da acessibilidade do Ilha", divider = false) { openA11yDetails(ctx) }
+        }
         Group("Não consigo ativar a acessibilidade") {
             InfoText("No Android 13 ou mais novo, apps instalados fora da Play Store precisam de liberação: Informações do app → ⋮ → \"Permitir configurações restritas\". Depois ative em Acessibilidade.")
         }
@@ -591,6 +602,24 @@ fun HelpScreen(back: () -> Unit) {
 }
 
 // ---------- utilidades ----------
+
+/** O Android pôs o Ilha no botão flutuante da acessibilidade? */
+fun a11yShortcutOn(ctx: Context): Boolean {
+    val me = ComponentName(ctx, IslandService::class.java)
+    val v = runCatching { AndroidSettings.Secure.getString(ctx.contentResolver, "accessibility_button_targets") }.getOrNull().orEmpty()
+    return v.split(':').any { ComponentName.unflattenFromString(it) == me }
+}
+
+/** Abre a tela da acessibilidade do próprio Ilha, onde fica o interruptor do atalho. */
+fun openA11yDetails(ctx: Context) {
+    if (Build.VERSION.SDK_INT >= 31) {
+        val i = Intent(AndroidSettings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+            .putExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName(ctx, IslandService::class.java).flattenToString())
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { ctx.startActivity(i) }.isSuccess) return
+    }
+    open(ctx, AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS)
+}
 
 fun a11yEnabled(ctx: Context): Boolean {
     val list = AndroidSettings.Secure.getString(ctx.contentResolver, AndroidSettings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()

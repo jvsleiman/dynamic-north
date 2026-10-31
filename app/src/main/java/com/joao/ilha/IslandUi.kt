@@ -9,6 +9,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -82,6 +83,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +103,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -113,7 +116,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.palette.graphics.Palette
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.sign
 import kotlin.math.roundToInt
 
 private val Green = Color(0xFF34C759)
@@ -287,6 +292,13 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     }
     val onBubble = { actions.onBubble(bubbleAct) }
 
+    // Arrastar para o lado: a notificação acompanha o dedo e fecha ao soltar longe ou rápido.
+    val swipeable = mode == Mode.Notification || mode == Mode.SmallNotif
+    val drag = remember { Animatable(0f) }
+    val dragScope = rememberCoroutineScope()
+    // Ilha mudou de modo (fechou ou chegou outra coisa): volta para o lugar na hora, sem deslizar de volta.
+    LaunchedEffect(mode) { drag.snapTo(0f) }
+
     val density = LocalDensity.current
     // Área de toque = ilha + bolinhas. A janela desenhada é fixa, então isso não aparece na tela.
     val touchW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
@@ -311,12 +323,45 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = { actions.onTap() }, onLongPress = { actions.onHold() })
                     }
-                    .pointerInput(Unit) {
-                        var drag = 0f
+                    .graphicsLayer {
+                        // Notificação segue o dedo e vai sumindo; o resto só cede um pouco.
+                        val x = drag.value
+                        translationX = if (swipeable) x else x * 0.25f
+                        if (swipeable) alpha = (1f - abs(x) / (size.width * 0.9f)).coerceIn(0f, 1f)
+                    }
+                    .pointerInput(swipeable) {
+                        val tracker = VelocityTracker()
+                        var dx = 0f
                         detectHorizontalDragGestures(
-                            onDragStart = { drag = 0f },
-                            onDragEnd = { if (abs(drag) > 60.dp.toPx()) actions.onSwipe(drag) },
-                            onHorizontalDrag = { _, d -> drag += d },
+                            onDragStart = { tracker.resetTracking(); dx = 0f },
+                            onDragEnd = {
+                                val v = tracker.calculateVelocity().x
+                                val far = abs(dx) > (if (swipeable) 48.dp else 60.dp).toPx()
+                                val fling = abs(v) > 900f && (dx == 0f || sign(v) == sign(dx))
+                                val dir = if (dx != 0f) dx else v
+                                dragScope.launch {
+                                    if (!(far || fling)) drag.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 600f))
+                                    else if (swipeable) {
+                                        // Sai pela lateral e só então fecha.
+                                        drag.animateTo(sign(dir) * size.width * 1.2f, tween(150))
+                                        actions.onSwipe(dir)
+                                        delay(700)
+                                        drag.snapTo(0f)
+                                    } else {
+                                        actions.onSwipe(dir)
+                                        drag.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 600f))
+                                    }
+                                }
+                            },
+                            onDragCancel = { dragScope.launch { drag.animateTo(0f) } },
+                            onHorizontalDrag = { ch, d ->
+                                ch.consume()
+                                tracker.addPosition(ch.uptimeMillis, ch.position)
+                                dx += d
+                                dragScope.launch { drag.snapTo(dx) }
+                            },
+                        )
+                    },
                         )
                     },
             ) {
