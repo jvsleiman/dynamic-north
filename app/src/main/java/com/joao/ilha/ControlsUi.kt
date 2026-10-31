@@ -308,7 +308,12 @@ internal fun StatusPopup(kind: StatusKind, h: Dp) {
         StatusKind.Unlocked -> Triple(Icons.Rounded.LockOpen, "", col.text)
     }
     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(h * 0.5f))
+        if (kind == StatusKind.Silent) {
+            // Silencioso: sininho branco numa pílula vermelha.
+            Box(Modifier.height(h * 0.62f).width(h * 0.95f).clip(CircleShape).background(tint), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = Color.White, modifier = Modifier.size(h * 0.42f))
+            }
+        } else Icon(icon, null, tint = tint, modifier = Modifier.size(h * 0.5f))
         Spacer(Modifier.weight(1f))
         if (label.isNotEmpty()) Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

@@ -56,9 +56,12 @@ data class CallInfo(
     val answer: PendingIntent?,
     val decline: PendingIntent?,
     val contentIntent: PendingIntent?,
+    val appName: String = "",
+    /** Botões que o próprio app oferece na chamada (mudo, alto-falante, vídeo…), sem o de atender. */
+    val actions: List<NotifAction> = emptyList(),
 )
 
-enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording }
+enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip }
 
 /** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
 data class LiveInfo(
@@ -73,6 +76,11 @@ data class LiveInfo(
     val countDown: Boolean,
     val contentIntent: PendingIntent?,
     val actions: List<NotifAction>,
+    /** Progresso de 0 a 1 (downloads, envios); -1 quando não há. */
+    val progress: Float = -1f,
+    val appName: String = "",
+    val smallIcon: Icon? = null,
+    val color: Int = 0,
 )
 
 data class ChargingInfo(val level: Int, val charging: Boolean)
@@ -95,6 +103,8 @@ sealed interface Popup {
     data class Volume(val level: Int, val max: Int, val ring: Boolean) : Popup
     /** Aviso curto do sistema: modo silencioso, Não perturbe, desbloqueio. */
     data class Status(val kind: StatusKind) : Popup
+    /** Algo terminou (download concluído). */
+    data class Done(val title: String, val app: String, val icon: Icon?, val color: Int) : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */

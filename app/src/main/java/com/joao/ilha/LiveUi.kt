@@ -1,6 +1,30 @@
 package com.joao.ilha
 
 import androidx.compose.foundation.Image
+import android.graphics.drawable.Icon
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.MicOff
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -57,11 +81,15 @@ private fun LiveInfo.vector(): ImageVector = when (kind) {
     LiveKind.Alarm -> Icons.Rounded.Alarm
     LiveKind.Navigation -> Icons.Rounded.Navigation
     LiveKind.Recording -> RecordIcon
+    LiveKind.Progress -> Icons.Rounded.Download
+    LiveKind.Trip -> Icons.Rounded.DirectionsCar
 }
 
 private fun LiveInfo.tint(): Color = when (kind) {
     LiveKind.Navigation -> NavColor
     LiveKind.Recording -> RecColor
+    LiveKind.Progress -> CamColor
+    LiveKind.Trip -> if (color != 0) Color(color).copy(alpha = 1f) else NavColor
     else -> TimerColor
 }
 
@@ -110,12 +138,64 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        LiveIcon(l, (h - 14.dp) * ic)
-        val right = if (l.kind == LiveKind.Navigation) l.title else liveTime(l)
-        Text(
-            right, color = if (l.kind == LiveKind.Navigation) col.text else l.tint(),
-            fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-        )
+        when (l.kind) {
+            // Gravação: ponto vermelho e tempo na esquerda, microfone na direita.
+            LiveKind.Recording -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(RecColor))
+                    Spacer(Modifier.width(6.dp))
+                    Text(liveTime(l), color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+                Icon(Icons.Rounded.Mic, null, tint = col.text, modifier = Modifier.size((h - 14.dp) * ic))
+            }
+            // Download: ícone do app e anel de progresso.
+            LiveKind.Progress -> {
+                AppGlyph(l, (h - 12.dp) * ic)
+                ProgressRing(l.progress, CamColor, h - 12.dp, 2.5.dp)
+            }
+            LiveKind.Trip -> {
+                AppGlyph(l, (h - 12.dp) * ic)
+                Text(shortTrip(l), color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            else -> {
+                LiveIcon(l, (h - 14.dp) * ic)
+                val right = if (l.kind == LiveKind.Navigation) l.title else liveTime(l)
+                Text(
+                    right, color = if (l.kind == LiveKind.Navigation) col.text else l.tint(),
+                    fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/** "Chega em 3 min" → "3 min"; senão o título inteiro. */
+private fun shortTrip(l: LiveInfo): String =
+    Regex("\\d+\\s*min").find("${l.title} ${l.text}")?.value ?: l.title.ifBlank { l.text }
+
+/** Ícone do app (o pequeno, da barra de status) num quadradinho com a cor do app. */
+@Composable
+private fun AppGlyph(l: LiveInfo, size: Dp) {
+    val ctx = LocalContext.current
+    val bmp = remember(l.smallIcon) {
+        l.smallIcon?.let { i -> runCatching { i.setTint(android.graphics.Color.WHITE); i.loadDrawable(ctx)?.toBitmapSafe()?.asImageBitmap() }.getOrNull() }
+    }
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * 0.28f)).background(l.tint()), contentAlignment = Alignment.Center) {
+        if (bmp != null) Image(bmp, null, modifier = Modifier.size(size * 0.62f))
+        else Icon(l.vector(), null, tint = Color.White, modifier = Modifier.size(size * 0.62f))
+    }
+}
+
+@Composable
+internal fun ProgressRing(progress: Float, color: Color, size: Dp, stroke: Dp, done: Boolean = false) {
+    val shown by animateFloatAsState(progress.coerceIn(0f, 1f), tween(400), label = "ring")
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = stroke.toPx()
+            drawCircle(color.copy(alpha = 0.25f), radius = (this.size.minDimension - w) / 2, style = Stroke(w))
+            drawArc(color, -90f, 360f * (if (done) 1f else shown), false, topLeft = Offset(w / 2, w / 2), size = Size(this.size.width - w, this.size.height - w), style = Stroke(w, cap = StrokeCap.Round))
+        }
+        if (done) Icon(Icons.Rounded.Check, null, tint = color, modifier = Modifier.size(size * 0.6f))
     }
 }
 
@@ -123,39 +203,145 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
 
 @Composable
 internal fun ExpandedLive(l: LiveInfo) {
+    when (l.kind) {
+        LiveKind.Navigation -> ExpandedNav(l)
+        LiveKind.Progress -> ExpandedProgress(l)
+        LiveKind.Trip -> ExpandedTrip(l)
+        else -> ExpandedTimer(l)
+    }
+}
+
+@Composable
+private fun ExpandedNav(l: LiveInfo) {
     val col = LocalIslandColors.current
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
         Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            if (l.kind == LiveKind.Navigation) {
-                Box(Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(NavColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                    LiveIcon(l, 40.dp)
+            Box(Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)).background(NavColor.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                LiveIcon(l, 40.dp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(l.title, color = col.text, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(l.text, color = col.dim, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        LiveActions(l)
+    }
+}
+
+/** Timer, cronômetro e gravação: botões redondos na esquerda e o tempo grande na direita. */
+@Composable
+private fun ExpandedTimer(l: LiveInfo) {
+    val col = LocalIslandColors.current
+    val icons = l.actions.map { actionIcon(it.title) }
+    val round = l.actions.isNotEmpty() && icons.all { it != null }
+    val label = when (l.kind) {
+        LiveKind.Timer -> "Timer"
+        LiveKind.Recording -> "Gravando"
+        else -> "Cronômetro"
+    }
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        if (l.kind == LiveKind.Recording) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(RecColor))
+                Spacer(Modifier.width(6.dp))
+                Text(liveTime(l), color = col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (round) {
+                l.actions.forEachIndexed { i, a ->
+                    val (icon, strong) = icons[i]!!
+                    val bg = if (strong) l.tint().copy(alpha = 0.3f) else col.text.copy(alpha = 0.16f)
+                    Box(
+                        Modifier.size(46.dp).clip(CircleShape).background(bg)
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } },
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(icon, a.title, tint = if (strong) l.tint() else col.text, modifier = Modifier.size(24.dp)) }
+                    Spacer(Modifier.width(10.dp))
                 }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(l.title, color = col.text, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(l.text, color = col.dim, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
+                Spacer(Modifier.weight(1f))
             } else {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(l.vector(), null, tint = l.tint(), modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(
-                            when (l.kind) {
-                                LiveKind.Timer -> "Timer"
-                                LiveKind.Recording -> "Gravando"
-                                else -> "Cronômetro"
-                            },
-                            color = l.tint(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        )
+                        Text(label, color = l.tint(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                     val sub = listOf(l.title, l.text).firstOrNull { it.isNotBlank() && !timeLike.matches(it.trim()) }
                     if (sub != null) Text(sub, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(liveTime(l), color = l.tint(), fontSize = 42.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            if (l.kind == LiveKind.Recording) {
+                Text(l.title.ifBlank { label }, color = col.text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    if (round) Text(label, color = l.tint(), fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(end = 6.dp, bottom = 8.dp))
+                    Text(liveTime(l), color = l.tint(), fontSize = 40.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+                }
+            }
+        }
+        if (!round) LiveActions(l)
+    }
+}
+
+@Composable
+private fun ExpandedProgress(l: LiveInfo) {
+    val col = LocalIslandColors.current
+    Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+        AppGlyph(l, 44.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(l.appName.ifBlank { "Baixando" }, color = col.dim, fontSize = 12.sp, maxLines = 1)
+            Text(l.title.ifBlank { l.text }, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Spacer(Modifier.width(8.dp))
+        Box(contentAlignment = Alignment.Center) {
+            ProgressRing(l.progress, CamColor, 46.dp, 3.5.dp)
+            Text("${(l.progress.coerceIn(0f, 1f) * 100).toInt()}%", color = col.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+/** Corrida ou entrega: logo do app, título grande e a foto (motorista, carro, pedido) na direita. */
+@Composable
+private fun ExpandedTrip(l: LiveInfo) {
+    val col = LocalIslandColors.current
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                AppGlyph(l, 30.dp)
+                Spacer(Modifier.height(8.dp))
+                Text(l.title.ifBlank { l.appName }, color = col.text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (l.text.isNotBlank()) Text(l.text, color = col.dim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            l.icon?.let { bmp ->
+                Spacer(Modifier.width(12.dp))
+                Image(bmp.asImageBitmap(), null, contentScale = ContentScale.Crop, modifier = Modifier.size(84.dp).clip(RoundedCornerShape(18.dp)))
             }
         }
         LiveActions(l)
+    }
+}
+
+/** Ícone para um botão de notificação pelo nome (pausar, parar, mudo…); true = destaque. */
+internal fun actionIcon(title: String): Pair<ImageVector, Boolean>? {
+    val t = title.lowercase()
+    fun has(vararg w: String) = w.any { it in t }
+    return when {
+        has("desligar", "encerrar", "hang up", "end call", "sair da chamada", "leave") -> Icons.Rounded.CallEnd to true
+        has("ativar som", "unmute", "desmutar") -> Icons.Rounded.MicOff to false
+        has("mudo", "mute", "silenciar", "microfone", "mic") -> Icons.Rounded.Mic to false
+        has("alto-falante", "alto falante", "viva-voz", "speaker") -> Icons.AutoMirrored.Rounded.VolumeUp to false
+        has("vídeo", "video", "câmera", "camera") -> Icons.Rounded.Videocam to false
+        has("retomar", "continuar", "resume", "iniciar", "start") -> Icons.Rounded.PlayArrow to true
+        has("pausar", "pause") -> Icons.Rounded.Pause to true
+        has("soneca", "snooze", "adiar") -> Icons.Rounded.Snooze to false
+        has("volta", "lap") -> Icons.Rounded.Flag to false
+        has("+1", "adicionar 1", "add 1") -> Icons.Rounded.Add to false
+        has("redefinir", "zerar", "reset", "reiniciar") -> Icons.Rounded.Replay to false
+        has("parar", "stop", "cancelar", "cancel", "excluir", "dispensar", "dismiss", "fechar", "close") -> Icons.Rounded.Close to false
+        else -> null
     }
 }
 

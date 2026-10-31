@@ -98,9 +98,10 @@ class NotifListener : NotificationListenerService() {
         IslandBus.live.value = list
             .mapNotNull { sbn -> liveKind(sbn)?.let { sbn to it } }
             // Alarme tocando tem prioridade; depois navegação; depois timers.
-            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { -it.first.postTime }))
+            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress }, { -it.first.postTime }))
             .firstOrNull()
             ?.let { (sbn, kind) -> toLive(sbn, kind) }
+        watchDone(IslandBus.live.value)
     }
 
     /** Descobre se a notificação é um timer, cronômetro, alarme tocando ou navegação. */
@@ -122,6 +123,7 @@ class NotifListener : NotificationListenerService() {
         val text = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
         if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
         if (!s.liveEnabled) return null
+        if (pkg in tripApps) return LiveKind.Trip
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val words = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)} ${n.channelIdSafe()}".lowercase()
         val isStopwatch = listOf("cronômetro", "cronometro", "stopwatch").any { it in words }
@@ -131,8 +133,21 @@ class NotifListener : NotificationListenerService() {
             clockApp && isStopwatch -> LiveKind.Stopwatch
             clockApp && isTimer -> LiveKind.Timer
             clockApp && chrono -> LiveKind.Stopwatch
+            // Download, envio ou instalação com barra de progresso.
+            !clockApp && ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0 && !ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) -> LiveKind.Progress
             else -> null
         }
+    }
+
+    private var lastProgress: LiveInfo? = null
+
+    /** Download que sumiu ou chegou ao fim perto de 100%: avisa "Concluído". */
+    private fun watchDone(now: LiveInfo?) {
+        val prev = lastProgress
+        lastProgress = now?.takeIf { it.kind == LiveKind.Progress && it.progress < 1f }
+        if (prev == null) return
+        val finished = (now?.key == prev.key && now.progress >= 1f) || (now?.key != prev.key && prev.progress >= 0.9f)
+        if (finished) IslandBus.show(Popup.Done(prev.title, prev.appName, prev.smallIcon, prev.color))
     }
 
     /** Primeira vez que cada notificação apareceu (a hora de postagem muda a cada atualização). */
@@ -187,6 +202,10 @@ class NotifListener : NotificationListenerService() {
                 else -> 0L
             },
             countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
+            progress = ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0).let { max -> if (max > 0) ex.getInt(Notification.EXTRA_PROGRESS, 0).toFloat() / max else -1f },
+            appName = appLabel(this, sbn.packageName),
+            smallIcon = n.smallIcon,
+            color = n.color,
             contentIntent = n.contentIntent,
             actions = n.actions.orEmpty().mapNotNull { a ->
                 val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -277,6 +296,12 @@ class NotifListener : NotificationListenerService() {
             answer = answer,
             decline = decline,
             contentIntent = n.contentIntent,
+            appName = appLabel(this, sbn.packageName),
+            actions = n.actions.orEmpty().mapNotNull { a ->
+                val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                if (a.actionIntent == null || a.actionIntent == answer) return@mapNotNull null
+                NotifAction(t, a.actionIntent, null)
+            }.take(5),
         )
     }
 
@@ -327,6 +352,12 @@ class NotifListener : NotificationListenerService() {
 }
 
 private val recorderWords = listOf("gravando", "gravação de tela", "gravacao de tela", "recording", "screen record")
+
+/** Corridas e entregas: a notificação contínua vira atividade ao vivo. */
+private val tripApps = setOf(
+    "com.ubercab", "com.ubercab.eats", "com.taxis99", "br.com.brainweb.ifood", "com.grability.rappi",
+    "com.cabify.rider", "com.indriver", "sinet.startup.inDriver", "com.mercadolibre", "com.shopee.br",
+)
 
 private val navApps = setOf("com.google.android.apps.maps", "com.waze", "com.here.app.maps", "com.sygic.aura", "ru.yandex.yandexnavi")
 

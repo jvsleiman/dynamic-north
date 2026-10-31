@@ -92,6 +92,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -142,7 +143,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
-    Volume(false), ExpandedControls(true), Status(false),
+    Volume(false), ExpandedControls(true), Status(false), Done(true),
 }
 
 @Composable
@@ -197,6 +198,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Reminder -> Mode.Reminder
         popup is Popup.Volume -> Mode.Volume
         popup is Popup.Status -> Mode.Status
+        popup is Popup.Done -> Mode.Done
         main == Act.Call -> Mode.Call
         main == Act.Live -> Mode.Live
         main == Act.Media -> Mode.Media
@@ -252,10 +254,22 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Reminder -> wide to 78.dp * k * t
         Mode.Volume -> baseW + grow + 90.dp to baseH
         Mode.Status -> baseW + grow + 96.dp to baseH
+        Mode.Done -> wide to 70.dp * k * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
-        Mode.Live -> baseW + grow + (if (live?.kind == LiveKind.Navigation) 64.dp else 28.dp) to baseH
+        Mode.Live -> baseW + grow + when (live?.kind) {
+            LiveKind.Navigation, LiveKind.Trip -> 64.dp
+            LiveKind.Recording -> 44.dp
+            else -> 28.dp
+        } to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
-        Mode.ExpandedLive -> wide to (if (live?.actions.isNullOrEmpty()) 92.dp else 132.dp) * k * t
+        Mode.ExpandedLive -> wide to when {
+            live?.kind == LiveKind.Progress -> 78.dp
+            live?.kind == LiveKind.Trip -> if (live.actions.isEmpty()) 128.dp else 168.dp
+            live?.actions.isNullOrEmpty() -> 92.dp
+            // Botões redondos ficam ao lado do tempo, na mesma linha.
+            live!!.kind != LiveKind.Navigation && live.actions.all { actionIcon(it.title) != null } -> if (live.kind == LiveKind.Recording) 112.dp else 94.dp
+            else -> 132.dp
+        } * k * t
         Mode.ExpandedHealth -> wide to 158.dp * k * t
         Mode.ExpandedBreathe -> wide to 168.dp * k
     }
@@ -410,6 +424,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Live -> live?.let { CompactLive(it, baseH) }
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
                         Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
+                        Mode.Done -> (popup as? Popup.Done)?.let { DoneBanner(it) }
                         Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
                         Mode.ExpandedLive -> live?.let { ExpandedLive(it) }
@@ -653,7 +668,7 @@ private fun CompactMedia(m: MediaInfo, h: Dp) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Art(m.art?.asImageBitmap(), h - 10.dp, CircleShape, spinning = m.playing)
-        Bars(m.playing, Green, Modifier.size(h - 12.dp))
+        Bars(m.playing, artAccent(m.art), Modifier.size(h - 12.dp))
     }
 }
 
@@ -872,19 +887,61 @@ private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
     val col = LocalIslandColors.current
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Avatar(c.photo, 48.dp)
+            Box(Modifier.pointerInput(c.key) { detectTapGestures { runCatching { c.contentIntent?.send() }; actions.onCollapse() } }) {
+                Avatar(c.photo, 48.dp)
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(c.name, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Timer(c.startedAt, Green, 13)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (c.appName.isNotBlank()) Text("${c.appName} · ", color = col.dim, fontSize = 13.sp, maxLines = 1)
+                    Timer(c.startedAt, Green, 13)
+                }
             }
             Bars(true, Color(Prefs.state.value.callWaveColor), Modifier.size(24.dp))
         }
         Spacer(Modifier.weight(1f))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            RoundButton(Icons.Rounded.Call, Color(0xFF3A3A3C), 44.dp) { runCatching { c.contentIntent?.send() }; actions.onCollapse() }
-            RoundButton(Icons.Rounded.CallEnd, Red, 44.dp) { runCatching { c.decline?.send() }; actions.onCollapse() }
+        // Só os botões que o app da chamada oferece (WhatsApp, Discord, telefone…).
+        val buttons = c.actions.filter { it.intent != c.answer }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            if (buttons.isEmpty()) {
+                RoundButton(Icons.Rounded.Call, Color(0xFF3A3A3C), 48.dp) { runCatching { c.contentIntent?.send() }; actions.onCollapse() }
+                RoundButton(Icons.Rounded.CallEnd, Red, 48.dp) { runCatching { c.decline?.send() }; actions.onCollapse() }
+            } else buttons.forEach { a ->
+                val mapped = actionIcon(a.title)
+                val end = mapped?.first == Icons.Rounded.CallEnd || a.intent == c.decline
+                if (mapped != null || end) {
+                    RoundButton(if (end) Icons.Rounded.CallEnd else mapped!!.first, if (end) Red else Color(0xFF3A3A3C), 48.dp) {
+                        runCatching { a.intent.send() }
+                        if (end) actions.onCollapse()
+                    }
+                } else {
+                    Box(
+                        Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF3A3A3C))
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                            .padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(a.title, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+            }
         }
+    }
+}
+
+/** Algo terminou (download): ícone do app, "Concluído" e o visto verde. */
+@Composable
+private fun DoneBanner(d: Popup.Done) {
+    val col = LocalIslandColors.current
+    Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(if (d.color != 0) Color(d.color).copy(alpha = 1f) else Color(0xFF3A3A3C)), contentAlignment = Alignment.Center) {
+            SmallIcon(d.icon, 24.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Concluído", color = col.dim, fontSize = 12.sp)
+            Text(d.title.ifBlank { d.app }, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        ProgressRing(1f, CamColor, 38.dp, 3.dp, done = true)
     }
 }
 
@@ -915,7 +972,7 @@ private fun ExpandedMedia(m: MediaInfo, s: Settings, actions: IslandActions) {
                     Text(m.title, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(m.artist.ifBlank { m.appName }, color = col.dim, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Bars(m.playing, Green, Modifier.size(22.dp))
+                Bars(m.playing, artAccent(m.art), Modifier.size(22.dp))
             }
             Spacer(Modifier.height(14.dp))
             Progress(m)
@@ -924,17 +981,72 @@ private fun ExpandedMedia(m: MediaInfo, s: Settings, actions: IslandActions) {
                 VolumeBar()
             }
             Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                if (s.seekButtons) Control(Icons.Rounded.Replay10, 28.dp) { controls.seekTo((livePosition(m) - 10_000).coerceAtLeast(0)) }
-                Control(Icons.Rounded.SkipPrevious, 34.dp) { controls.skipToPrevious() }
-                Control(if (m.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, 46.dp) {
-                    if (m.playing) controls.pause() else controls.play()
+            // Botões extras do próprio app (curtir, repetir, aleatório…) ficam nas pontas.
+            val custom = remember(m) { m.controller.playbackState?.customActions.orEmpty().take(2) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                    custom.getOrNull(0)?.let { CustomAction(m, it) }
+                        ?: if (s.seekButtons) Control(Icons.Rounded.Replay10, 28.dp) { controls.seekTo((livePosition(m) - 10_000).coerceAtLeast(0)) } else Unit
                 }
-                Control(Icons.Rounded.SkipNext, 34.dp) { controls.skipToNext() }
-                if (s.seekButtons) Control(Icons.Rounded.Forward10, 28.dp) { controls.seekTo(livePosition(m) + 10_000) }
+                Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Control(Icons.Rounded.SkipPrevious, 34.dp) { controls.skipToPrevious() }
+                    // Tocar/pausar num círculo branco, como no iPhone.
+                    Box(
+                        Modifier.size(50.dp).clip(CircleShape).background(col.text)
+                            .pointerInput(m.playing) { detectTapGestures { if (m.playing) controls.pause() else controls.play() } },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(if (m.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, null, tint = colorsBg(), modifier = Modifier.size(28.dp))
+                    }
+                    Control(Icons.Rounded.SkipNext, 34.dp) { controls.skipToNext() }
+                }
+                Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                    custom.getOrNull(1)?.let { CustomAction(m, it) }
+                        ?: if (s.seekButtons) Control(Icons.Rounded.Forward10, 28.dp) { controls.seekTo(livePosition(m) + 10_000) } else Unit
+                }
             }
         }
     }
+}
+
+@Composable
+private fun colorsBg(): Color = LocalIslandColors.current.bg.let { if (it.alpha < 0.5f) Color.Black else it }
+
+/** Botão extra que o app de música oferece, com o ícone do próprio app. */
+@Composable
+private fun CustomAction(m: MediaInfo, a: android.media.session.PlaybackState.CustomAction) {
+    val ctx = LocalContext.current
+    val col = LocalIslandColors.current
+    val bmp = remember(m.pkg, a.icon) {
+        runCatching {
+            val res = ctx.packageManager.getResourcesForApplication(m.pkg)
+            @Suppress("DEPRECATION")
+            res.getDrawable(a.icon)?.toBitmapSafe()?.asImageBitmap()
+        }.getOrNull()
+    }
+    Box(
+        Modifier.size(32.dp).clip(CircleShape).pointerInput(a.action) { detectTapGestures { m.controller.transportControls.sendCustomAction(a, null) } },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bmp != null) Image(bmp, a.name?.toString(), colorFilter = ColorFilter.tint(col.text), modifier = Modifier.size(22.dp))
+        else Text(a.name?.toString()?.take(3).orEmpty(), color = col.dim, fontSize = 10.sp)
+    }
+}
+
+/** Cor viva da capa, para as barrinhas do som (como no iPhone). */
+@Composable
+private fun artAccent(art: Bitmap?): Color = remember(art) {
+    art?.let { b ->
+        runCatching {
+            val p = Palette.from(b).maximumColorCount(12).generate()
+            val sw = p.vibrantSwatch ?: p.lightVibrantSwatch ?: p.lightMutedSwatch ?: p.dominantSwatch ?: return@runCatching null
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(sw.rgb, hsv)
+            hsv[1] = hsv[1].coerceIn(0.35f, 0.85f)
+            hsv[2] = hsv[2].coerceAtLeast(0.8f)
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }.getOrNull()
+    } ?: Green
 }
 
 private fun livePosition(m: MediaInfo): Long =
@@ -983,7 +1095,7 @@ private fun Progress(m: MediaInfo) {
                 Box(Modifier.fillMaxHeight().fillMaxWidth(frac).background(col.text))
             }
         }
-        Text(if (dur > 0) fmt(dur) else "--:--", color = col.dim, fontSize = 11.sp)
+        Text(if (dur > 0) "-" + fmt((dur - if (dragFrac != null) (frac * dur).toLong() else pos).coerceAtLeast(0)) else "--:--", color = col.dim, fontSize = 11.sp)
     }
 }
 
