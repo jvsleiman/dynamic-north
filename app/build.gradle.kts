@@ -20,8 +20,8 @@ android {
         applicationId = "com.joao.ilha"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "0.9.7"
+        versionCode = 17
+        versionName = "0.9.8"
     }
 
     signingConfigs {

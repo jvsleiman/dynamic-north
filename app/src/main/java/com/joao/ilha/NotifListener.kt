@@ -118,7 +118,7 @@ class NotifListener : NotificationListenerService() {
         }
         if (!sbn.isOngoing) return null
         val ex = n.extras
-        // Gravador de tela/voz: o Ilha não grava nada, só mostra o tempo da gravação do outro app.
+        // Gravador de tela/voz: o Notch não grava nada, só mostra o tempo da gravação do outro app.
         val text = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
         if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
         if (!s.liveEnabled) return null
@@ -216,7 +216,26 @@ class NotifListener : NotificationListenerService() {
                 val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 NotifAction(t, a.actionIntent ?: return@mapNotNull null, a.remoteInputs?.firstOrNull { it.allowFreeFormInput })
             }.take(3),
+            messages = if (text == "Conteúdo sensível oculto") emptyList() else messagesOf(ex),
+            color = n.color,
         )
+    }
+
+    /** Conversa inteira: estilo de mensagens (WhatsApp, Telegram) ou, se não houver, as linhas da caixa de entrada. */
+    private fun messagesOf(ex: android.os.Bundle): List<Msg> {
+        @Suppress("DEPRECATION")
+        val raw = runCatching { ex.getParcelableArray(Notification.EXTRA_MESSAGES) }.getOrNull()
+        val msgs = raw.orEmpty().mapNotNull { p ->
+            val b = p as? android.os.Bundle ?: return@mapNotNull null
+            val text = b.getCharSequence("text")?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            @Suppress("DEPRECATION")
+            val person = if (Build.VERSION.SDK_INT >= 28) runCatching { b.getParcelable<android.app.Person>("sender_person")?.name }.getOrNull() else null
+            Msg((person ?: b.getCharSequence("sender"))?.toString().orEmpty(), text)
+        }
+        if (msgs.isNotEmpty()) return msgs.takeLast(20)
+        return ex.getCharSequenceArray(Notification.EXTRA_TEXT_LINES).orEmpty()
+            .mapNotNull { it?.toString()?.takeIf { t -> t.isNotBlank() }?.let { t -> Msg("", t) } }
+            .takeLast(20)
     }
 
     private fun isSensitive(title: String, text: String): Boolean {

@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- celular com a ilha vazada -->
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M41,38h26a12,12 0,0 1,12 12v58h-50v-58a12,12 0,0 1,12 -12z M40.7,42.6h26.6a6.65,6.65 0,0 1,0 13.3h-26.6a6.65,6.65 0,0 1,0 -13.3z" />
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M40,49.25m-2.15,0a2.15,2.15 0,1 1,4.3 0a2.15,2.15 0,1 1,-4.3 0 M45.35,47.7h1.7v3.1h-1.7z M48.35,45.9h1.7v6.7h-1.7z M51.35,46.95h1.7v4.6h-1.7z M54.35,45.65h1.7v7.2h-1.7z M57.35,48.05h1.7v2.4h-1.7z" />
+</vector>

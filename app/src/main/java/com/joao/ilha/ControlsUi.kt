@@ -157,7 +157,7 @@ internal fun ControlsCard(s: Settings, actions: IslandActions) {
         } else {
             Spacer(Modifier.height(8.dp))
             Text(
-                "Escolha atalhos de apps em Controles rápidos, no app Ilha",
+                "Escolha atalhos de apps em Controles rápidos, no app Notch",
                 color = col.dim, fontSize = 10.sp, modifier = Modifier.align(Alignment.CenterHorizontally),
             )
         }

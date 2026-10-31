@@ -57,6 +57,8 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Headphones
@@ -160,6 +162,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val screenW by state.screenWidthDp.collectAsState()
     val offsetX by state.offsetXPx.collectAsState()
     val focus by state.focus.collectAsState()
+    val thread by state.thread.collectAsState()
 
     // Atividades ao mesmo tempo: a principal fica na ilha e a outra na bolinha.
     // Tocar na bolinha troca as duas (focus).
@@ -235,7 +238,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Charging -> baseW + grow + 24.dp to baseH
         Mode.Bluetooth -> baseW + grow + 48.dp to baseH
         Mode.SmallNotif -> minOf(wide, baseW + grow + 120.dp) to baseH
-        Mode.Notification -> wide to 78.dp * k * t + actionsH
+        Mode.Notification -> wide to 78.dp * k * t + actionsH +
+            (if (thread) ThreadRow * t * (popupItem?.messages?.size ?: 0).coerceIn(1, 6) + 8.dp else 0.dp)
         Mode.Test -> wide to 78.dp * k * t
         Mode.IncomingCall -> wide to 84.dp * k
         Mode.ExpandedCall -> wide to 132.dp * k
@@ -389,7 +393,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Charging -> (popup as? Popup.Charging)?.let { CompactCharging(it.info, baseH) }
                         Mode.Bluetooth -> (popup as? Popup.Bluetooth)?.let { CompactBluetooth(it.info, baseH) }
                         Mode.SmallNotif -> (popup as? Popup.Notification)?.let { SmallNotification(it.item, baseH) }
-                        Mode.Notification -> (popup as? Popup.Notification)?.let { NotificationBanner(it.item, s.showNotifActions, actions) }
+                        Mode.Notification -> (popup as? Popup.Notification)?.let { NotificationBanner(it.item, s.showNotifActions, thread, actions) }
                         Mode.Test -> TestBanner()
                         Mode.IncomingCall -> call?.let { IncomingCall(it) }
                         Mode.ExpandedCall -> call?.let { ExpandedCall(it, actions) }
@@ -735,22 +739,56 @@ private fun SmallNotification(n: NotifItem, h: Dp) {
 
 // ---------- modos grandes ----------
 
+private val ThreadRow = 38.dp
+
 @Composable
-private fun NotificationBanner(n: NotifItem, showActions: Boolean, actions: IslandActions) {
+private fun NotificationBanner(n: NotifItem, showActions: Boolean, thread: Boolean, actions: IslandActions) {
     val col = LocalIslandColors.current
     val ic = LocalIconScale.current
+    // A setinha aparece quando a conversa tem mais do que a mensagem que já está na tela.
+    val hasMore = n.messages.size > 1
     Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
-        Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
-            NotifPicture(n, 46.dp * ic)
+        Row(
+            Modifier.fillMaxWidth().then(if (thread) Modifier.height(50.dp) else Modifier.weight(1f)),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BadgedPicture(n, 46.dp * ic)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(n.title, color = col.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (n.text.isNotBlank()) Text(n.text, color = col.dim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (thread) Text("${n.messages.size} mensagens · ${n.appName}", color = col.dim, fontSize = 12.sp, maxLines = 1)
+                else if (n.text.isNotBlank()) Text(n.text, color = col.dim, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.width(8.dp))
-            Column(horizontalAlignment = Alignment.End) {
-                SmallIcon(n.smallIcon, 16.dp * ic)
-                Text(n.appName, color = col.dim, fontSize = 10.sp, maxLines = 1)
+            if (hasMore) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(col.text.copy(alpha = 0.14f))
+                        .pointerInput(thread) { detectTapGestures { actions.onThread(!thread) } },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(if (thread) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, "Ver mensagens", tint = col.text, modifier = Modifier.size(22.dp))
+                }
+            }
+        }
+        if (thread) {
+            val shown = n.messages.takeLast(6)
+            val group = shown.map { it.sender }.filter { it.isNotBlank() }.distinct().size > 1
+            Column(Modifier.fillMaxWidth().weight(1f).padding(top = 4.dp)) {
+                shown.forEach { m ->
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(ThreadRow)
+                            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.send() }; actions.onThread(false) } },
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        if (group && m.sender.isNotBlank()) Text(m.sender, color = col.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(m.text, color = col.text, fontSize = 13.sp, maxLines = if (group) 1 else 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
             }
         }
         if (showActions && n.actions.isNotEmpty()) {
@@ -769,6 +807,30 @@ private fun NotificationBanner(n: NotifItem, showActions: Boolean, actions: Isla
                     }
                 }
             }
+        }
+    }
+}
+
+/** Foto de quem mandou, com o ícone do app bem pequeno no canto de baixo. */
+@Composable
+private fun BadgedPicture(n: NotifItem, size: Dp) {
+    Box(Modifier.size(size)) {
+        NotifPicture(n, size)
+        if (n.largeIcon != null) {
+            val badge = size * 0.38f
+            val bg = if (n.color != 0) Color(n.color).copy(alpha = 1f) else Color(0xFF2A2A30)
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = 2.dp, y = 2.dp)
+                    .size(badge)
+                    .clip(CircleShape)
+                    .background(LocalIslandColors.current.bg)
+                    .padding(1.5.dp)
+                    .clip(CircleShape)
+                    .background(bg),
+                contentAlignment = Alignment.Center,
+            ) { SmallIcon(n.smallIcon, badge * 0.62f) }
         }
     }
 }

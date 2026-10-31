@@ -223,7 +223,7 @@ object CrashLog {
         override fun uncaughtException(t: Thread, e: Throwable) {
             runCatching {
                 val when_ = java.text.SimpleDateFormat("dd/MM HH:mm:ss", java.util.Locale.US).format(java.util.Date())
-                val info = "Ilha ${BuildConfig.VERSION_NAME} · Android ${android.os.Build.VERSION.RELEASE} · ${android.os.Build.MODEL} · $when_\n"
+                val info = "Notch ${BuildConfig.VERSION_NAME} · Android ${android.os.Build.VERSION.RELEASE} · ${android.os.Build.MODEL} · $when_\n"
                 java.io.File(ctx.filesDir, FILE).writeText(info + e.stackTraceToString().take(6000))
             }
             previous?.uncaughtException(t, e)

@@ -23,7 +23,13 @@ data class NotifItem(
     val postedAt: Long,
     val clearable: Boolean,
     val actions: List<NotifAction> = emptyList(),
+    /** Mensagens da conversa (WhatsApp, Telegram…), da mais antiga para a mais nova. */
+    val messages: List<Msg> = emptyList(),
+    /** Cor do app (verde do WhatsApp etc.), usada no selinho sobre a foto. */
+    val color: Int = 0,
 )
+
+data class Msg(val sender: String, val text: String)
 
 data class MediaInfo(
     val pkg: String,

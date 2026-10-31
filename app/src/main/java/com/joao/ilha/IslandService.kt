@@ -54,6 +54,8 @@ class IslandUiState {
     val offsetXPx = MutableStateFlow(0)
     /** Atividade escolhida como principal ao tocar na bolinha (null = ordem normal). */
     val focus = MutableStateFlow<Act?>(null)
+    /** Conversa da notificação aberta pela setinha (mostra as outras mensagens). */
+    val thread = MutableStateFlow(false)
 }
 
 /** Atividades que podem ocupar a ilha principal ou a bolinha. */
@@ -254,6 +256,7 @@ class IslandService : AccessibilityService() {
                         onOpen = ::openPkg,
                         onCollapse = ::collapse,
                         onBubble = ::bubbleTapped,
+                        onThread = ::openThread,
                     ),
                 )
             }
@@ -396,6 +399,7 @@ class IslandService : AccessibilityService() {
         if (p !is Popup.Test && inGame()) return
         if (ui.expanded.value && p !is Popup.Test) return
         ui.asleep.value = false
+        ui.thread.value = false
         ui.popup.value = p
         if (haptic) vibrate()
         popupJob?.cancel()
@@ -685,7 +689,24 @@ class IslandService : AccessibilityService() {
     }
 
     private fun collapse() {
+        if (ui.thread.value) closeThread()
         if (ui.expanded.value) ui.expanded.value = false
+    }
+
+    /** Setinha da notificação: abre a conversa e ela fica até a pessoa fechar. */
+    private fun openThread(open: Boolean) {
+        if (!open) return closeThread()
+        if (ui.popup.value !is Popup.Notification) return
+        popupJob?.cancel()
+        ui.thread.value = true
+    }
+
+    private fun closeThread() {
+        ui.thread.value = false
+        if (ui.popup.value is Popup.Notification) {
+            ui.popup.value = null
+            scheduleSleep()
+        }
     }
 
     private fun isCharging(): Boolean {
@@ -746,4 +767,6 @@ class IslandActions(
     val onBubble: (Act?) -> Unit,
     val onOpen: (String?) -> Unit,
     val onCollapse: () -> Unit,
+    /** Setinha da notificação: true abre a conversa, false fecha. */
+    val onThread: (Boolean) -> Unit,
 )

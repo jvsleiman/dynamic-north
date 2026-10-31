@@ -118,7 +118,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             a11yShortcut = a11yShortcutOn(ctx)
         }
     }
-    Page("Ilha", onBack = null) {
+    Page("Notch", onBack = null) {
         IslandPreview(s)
         if (!a11y || !listener) {
             Group(
@@ -135,7 +135,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             }
         }
         if (a11y && a11yShortcut) {
-            Group(footer = "É o atalho de acessibilidade do Android, não faz parte da ilha. Na tela que abrir, desligue \"Atalho do Ilha\" e deixe só \"Usar Ilha\" ligado.") {
+            Group(footer = "É o atalho de acessibilidade do Android, não faz parte da ilha. Na tela que abrir, desligue \"Atalho do Notch\" e deixe só \"Usar Notch\" ligado.") {
                 NavRow("Tirar o botão flutuante da lateral", icon = Icons.Rounded.PhoneIphone, iconColor = Color(0xFFFF9500), divider = false) { openA11yDetails(ctx) }
             }
         }
@@ -257,7 +257,7 @@ fun NotificationsScreen(back: () -> Unit, go: (Screen) -> Unit) {
             SwitchRow("Botões da notificação", s.showNotifActions, "Responder, marcar como lida e outros, direto na ilha") { v -> s.set { copy(showNotifActions = v) } }
             NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
-        Group("Não aparecem?", footer = "Desative e ative de novo o acesso às notificações do Ilha.") {
+        Group("Não aparecem?", footer = "Desative e ative de novo o acesso às notificações do Notch.") {
             val ctx = LocalContext.current
             NavRow("Abrir acesso às notificações", divider = false) { open(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS") }
         }
@@ -368,7 +368,7 @@ fun BluetoothScreen(back: () -> Unit) {
             }
         }
         if (!granted && Build.VERSION.SDK_INT >= 31) {
-            Group(footer = "Sem essa permissão o Android não avisa o Ilha quando um aparelho conecta.") {
+            Group(footer = "Sem essa permissão o Android não avisa o Notch quando um aparelho conecta.") {
                 NavRow("Permitir dispositivos próximos", divider = false) { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }
             }
         }
@@ -573,7 +573,7 @@ fun HelpScreen(back: () -> Unit) {
                 InfoText(log.lineSequence().take(4).joinToString("\n"))
                 NavRow("Copiar relatório do erro") {
                     val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Erro do Ilha", log))
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("Erro do Notch", log))
                     android.widget.Toast.makeText(ctx, "Copiado", android.widget.Toast.LENGTH_SHORT).show()
                 }
                 NavRow("Apagar", divider = false) {
@@ -585,9 +585,9 @@ fun HelpScreen(back: () -> Unit) {
         Group("A ilha some sozinha?") {
             InfoText("Alguns celulares (Motorola, Xiaomi, Samsung) fecham apps em segundo plano. Em Informações do app → Bateria, escolha \"Sem restrição\" e, se existir, ative a inicialização automática.")
         }
-        Group("Apareceu um ícone do Ilha na lateral da tela") {
-            InfoText("É o botão de atalho da acessibilidade do Android, que alguns celulares ligam junto com o serviço. Ele não é a ilha e pode ser desligado sem afetar nada: na tela abaixo, desligue \"Atalho do Ilha\" (ou \"Botão de acessibilidade\") e deixe só \"Usar Ilha\" ligado.")
-            NavRow("Abrir ajuste da acessibilidade do Ilha", divider = false) { openA11yDetails(ctx) }
+        Group("Apareceu um ícone do Notch na lateral da tela") {
+            InfoText("É o botão de atalho da acessibilidade do Android, que alguns celulares ligam junto com o serviço. Ele não é a ilha e pode ser desligado sem afetar nada: na tela abaixo, desligue \"Atalho do Notch\" (ou \"Botão de acessibilidade\") e deixe só \"Usar Notch\" ligado.")
+            NavRow("Abrir ajuste da acessibilidade do Notch", divider = false) { openA11yDetails(ctx) }
         }
         Group("Não consigo ativar a acessibilidade") {
             InfoText("No Android 13 ou mais novo, apps instalados fora da Play Store precisam de liberação: Informações do app → ⋮ → \"Permitir configurações restritas\". Depois ative em Acessibilidade.")
@@ -595,7 +595,7 @@ fun HelpScreen(back: () -> Unit) {
         Group("A ilha não fica em cima da câmera") {
             InfoText("Em Exibição, ajuste Horizontal e Vertical. Se o celular não informar a posição da câmera, desligue \"Centralizar na câmera\" e posicione à mão.")
         }
-        Group("O que o Ilha lê?") {
+        Group("O que o Notch lê?") {
             InfoText("Só as notificações, o player de música e o nome do app aberto (para esconder a ilha nos apps escolhidos). Nada sai do celular; a internet só é usada para procurar atualizações.")
         }
     }
@@ -603,14 +603,14 @@ fun HelpScreen(back: () -> Unit) {
 
 // ---------- utilidades ----------
 
-/** O Android pôs o Ilha no botão flutuante da acessibilidade? */
+/** O Android pôs o Notch no botão flutuante da acessibilidade? */
 fun a11yShortcutOn(ctx: Context): Boolean {
     val me = ComponentName(ctx, IslandService::class.java)
     val v = runCatching { AndroidSettings.Secure.getString(ctx.contentResolver, "accessibility_button_targets") }.getOrNull().orEmpty()
     return v.split(':').any { ComponentName.unflattenFromString(it) == me }
 }
 
-/** Abre a tela da acessibilidade do próprio Ilha, onde fica o interruptor do atalho. */
+/** Abre a tela da acessibilidade do próprio Notch, onde fica o interruptor do atalho. */
 fun openA11yDetails(ctx: Context) {
     if (Build.VERSION.SDK_INT >= 31) {
         val i = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
@@ -648,7 +648,7 @@ private fun ReactiveBarsGroup(s: Settings) {
     }
     Group(
         "Animação do som",
-        footer = "As barrinhas seguem a música de verdade. O Android pede a permissão de microfone para isso, mas o Ilha não grava nada: só lê a intensidade do som que está tocando.",
+        footer = "As barrinhas seguem a música de verdade. O Android pede a permissão de microfone para isso, mas o Notch não grava nada: só lê a intensidade do som que está tocando.",
     ) {
         SwitchRow("Barrinhas reagem ao som", s.reactiveBars && granted, divider = false) { v ->
             if (v && !granted) ask.launch(Manifest.permission.RECORD_AUDIO) else s.set { copy(reactiveBars = v) }
@@ -775,7 +775,7 @@ fun LiveScreen(back: () -> Unit) {
             SwitchRow("Alarme tocando", s.alarmEnabled, subtitle = "Ilha grande com soneca e parar") { v -> s.set { copy(alarmEnabled = v) } }
             SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = false) { v -> s.set { copy(navEnabled = v) } }
         }
-        Group(footer = "O Ilha não grava nada: só mostra o tempo enquanto o gravador do celular estiver gravando.") {
+        Group(footer = "O Notch não grava nada: só mostra o tempo enquanto o gravador do celular estiver gravando.") {
             SwitchRow("Gravação de tela e de voz", s.recorderEnabled) { v -> s.set { copy(recorderEnabled = v) } }
             SliderRow("Ajuste fino do tempo", s.liveOffsetMs / 100, -15..15, divider = false, format = { v ->
                 if (v == 0) "0 s" else "%+.1f s".format(v / 10f).replace('.', ',')
