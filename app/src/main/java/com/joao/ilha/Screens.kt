@@ -1,5 +1,7 @@
 package com.joao.ilha
 
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.WbCloudy
 import android.Manifest
 import android.content.ComponentName
 import android.content.Context
@@ -813,12 +815,19 @@ fun IdleScreen(back: () -> Unit) {
     val askSteps = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         pendingStyle?.let { st -> s.set { copy(idleStyle = st) } }
         Health.startSteps(ctx)
+        kotlinx.coroutines.MainScope().launch { Weather.refresh(ctx, force = true); Agenda.refresh(ctx) }
     }
     val pick: (IdleStyle) -> Unit = { st ->
         val needsSteps = st == IdleStyle.Steps || st == IdleStyle.Health
         if (needsSteps && !Health.hasStepPermission(ctx)) {
             pendingStyle = st
             askSteps.launch(Manifest.permission.ACTIVITY_RECOGNITION)
+        } else if (st == IdleStyle.Weather && !Weather.hasPermission(ctx)) {
+            pendingStyle = st
+            askSteps.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        } else if (st == IdleStyle.Agenda && !Agenda.hasPermission(ctx)) {
+            pendingStyle = st
+            askSteps.launch(Manifest.permission.READ_CALENDAR)
         } else s.set { copy(idleStyle = st) }
     }
     Page("Ilha parada", back) {
@@ -866,10 +875,11 @@ fun IdleScreen(back: () -> Unit) {
             }
         }
         Spacer(Modifier.height(18.dp))
-        Group(footer = "Em \"Ícones dos apps\" e \"Número\", a ilha volta ao tamanho simples quando não há notificações.") {
+        Group {
             NavRow("Usando agora", s.idleStyle.label) { scope.launch { pager.animateScrollToPage(styles.indexOf(s.idleStyle)) } }
             NavRow("Testar", divider = false) { IslandBus.show(Popup.Test) }
         }
+        MainIslandGroup(s)
     }
 }
 
@@ -907,6 +917,8 @@ private val idleHints = mapOf(
     IdleStyle.Alarm to "Abre o relógio",
     IdleStyle.Greeting to "Abre o relógio",
     IdleStyle.Pulse to "Uma luz verde respirando",
+    IdleStyle.Weather to "Temperatura agora",
+    IdleStyle.Agenda to "Quanto falta para o próximo compromisso",
     IdleStyle.Health to "Abre o painel de saúde",
     IdleStyle.Steps to "Abre o painel de saúde",
     IdleStyle.Water to "Toque na ilha aberta: +1 copo",
@@ -941,6 +953,41 @@ private fun IdleCard(style: IdleStyle, selected: Boolean, modifier: Modifier, on
         Spacer(Modifier.height(6.dp))
         Box(Modifier.clip(RoundedCornerShape(10.dp)).background(Color(0xFFEFC6F7)).padding(horizontal = 10.dp, vertical = 4.dp)) {
             Text(if (selected) "Em uso" else idleHints[style].orEmpty(), color = Color(0xFF7E2E9C), fontSize = 12.sp, maxLines = 1)
+        }
+    }
+}
+
+/** O que aparece ao tocar na ilha parada. */
+@Composable
+private fun MainIslandGroup(s: Settings) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val askLocation = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        s.set { copy(homeWeather = ok) }
+        if (ok) scope.launch { Weather.refresh(ctx, force = true) }
+    }
+    val askCalendar = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        s.set { copy(homeAgenda = ok) }
+        if (ok) scope.launch { Agenda.refresh(ctx) }
+    }
+    Group(
+        "Ilha principal",
+        footer = "Aparece ao tocar na ilha parada. As notificações ficam no botão dela. O clima usa a localização aproximada e vem da Open-Meteo; a agenda só é lida no celular.",
+    ) {
+        SwitchRow("Clima e próximas horas", s.homeWeather && Weather.hasPermission(ctx)) { v ->
+            if (v && !Weather.hasPermission(ctx)) askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+            else {
+                s.set { copy(homeWeather = v) }
+                if (v) scope.launch { Weather.refresh(ctx, force = true) }
+            }
+        }
+        SwitchRow("Saúde (passos, água, tempo de tela)", s.homeHealth) { v -> s.set { copy(homeHealth = v) } }
+        SwitchRow("Agenda da semana", s.homeAgenda && Agenda.hasPermission(ctx), divider = false) { v ->
+            if (v && !Agenda.hasPermission(ctx)) askCalendar.launch(Manifest.permission.READ_CALENDAR)
+            else {
+                s.set { copy(homeAgenda = v) }
+                if (v) scope.launch { Agenda.refresh(ctx) }
+            }
         }
     }
 }
@@ -980,6 +1027,8 @@ private fun IdlePill(style: IdleStyle, modifier: Modifier) {
             IdleStyle.ScreenBreak -> { icon(Icons.Rounded.Visibility, EyeColor); txt("18 min") }
             IdleStyle.Breathing -> { icon(Icons.Rounded.Air, BreathColor); Box(Modifier.size(11.dp).clip(CircleShape).background(BreathColor)) }
             IdleStyle.Bedtime -> { icon(Icons.Rounded.Bedtime, SleepColor); txt("2 h 10") }
+            IdleStyle.Weather -> { icon(Icons.Rounded.WbCloudy, Color.White); txt("28°") }
+            IdleStyle.Agenda -> { icon(Icons.Rounded.CalendarMonth, Color(0xFFFF453A)); txt("em 25 min") }
         }
     }
 }

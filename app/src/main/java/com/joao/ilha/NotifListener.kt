@@ -73,7 +73,8 @@ class NotifListener : NotificationListenerService() {
         refresh()
     }
 
-    private fun isCall(sbn: StatusBarNotification) = sbn.notification.category == Notification.CATEGORY_CALL
+    private fun isCall(sbn: StatusBarNotification) = sbn.notification.category == Notification.CATEGORY_CALL ||
+        (sbn.packageName in meetApps && sbn.isOngoing)
 
     private fun isRegular(sbn: StatusBarNotification): Boolean {
         val n = sbn.notification
@@ -124,6 +125,7 @@ class NotifListener : NotificationListenerService() {
         if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
         if (!s.liveEnabled) return null
         if (pkg in tripApps) return LiveKind.Trip
+        if (pkg in fitnessApps) return LiveKind.Workout
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val words = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)} ${n.channelIdSafe()}".lowercase()
         val isStopwatch = listOf("cronômetro", "cronometro", "stopwatch").any { it in words }
@@ -297,6 +299,7 @@ class NotifListener : NotificationListenerService() {
             decline = decline,
             contentIntent = n.contentIntent,
             appName = appLabel(this, sbn.packageName),
+            video = sbn.packageName in meetApps,
             actions = n.actions.orEmpty().mapNotNull { a ->
                 val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 if (a.actionIntent == null || a.actionIntent == answer) return@mapNotNull null
@@ -352,6 +355,16 @@ class NotifListener : NotificationListenerService() {
 }
 
 private val recorderWords = listOf("gravando", "gravação de tela", "gravacao de tela", "recording", "screen record")
+
+/** Reuniões de vídeo: a notificação contínua da reunião vira uma chamada de vídeo na ilha. */
+private val meetApps = setOf(
+    "com.google.android.apps.meetings", "com.google.android.apps.tachyon", "us.zoom.videomeetings", "com.microsoft.teams",
+)
+
+/** Treino em andamento (Google Fit, Strava, Samsung Health, Nike Run). */
+private val fitnessApps = setOf(
+    "com.google.android.apps.fitness", "com.strava", "com.sec.android.app.shealth", "com.nike.plusgps",
+)
 
 /** Corridas e entregas: a notificação contínua vira atividade ao vivo. */
 private val tripApps = setOf(

@@ -27,8 +27,8 @@ enum class BorderAnim(val label: String) { Off("Desligada"), Rainbow("Multicolor
 /** O que a ilha mostra quando não há nada acontecendo. */
 enum class IdleStyle(val label: String, val hidden: Boolean = false) {
     Simple("Simples (só a ilha)"),
-    AppIcons("Ícones dos apps com notificação"),
-    Count("Número de notificações"),
+    AppIcons("Ícones dos apps com notificação", hidden = true),
+    Count("Número de notificações", hidden = true),
     Clock("Hora"),
     Date("Data", hidden = true),
     Battery("Bateria"),
@@ -45,6 +45,8 @@ enum class IdleStyle(val label: String, val hidden: Boolean = false) {
     ScreenBreak("Pausa para os olhos"),
     Breathing("Respiração guiada"),
     Bedtime("Hora de dormir"),
+    Weather("Clima"),
+    Agenda("Próximo compromisso"),
     ;
 
     /** Estilos tirados da lista (0.9.5) continuam lidos dos ajustes antigos e viram o mais parecido. */
@@ -135,6 +137,10 @@ data class Settings(
     val recorderEnabled: Boolean = true,
     /** Avisos curtos do sistema (silencioso, Não perturbe, desbloqueio). */
     val statusAlerts: Boolean = true,
+    /** O que a ilha principal (tocar na ilha parada) mostra. */
+    val homeWeather: Boolean = true,
+    val homeHealth: Boolean = true,
+    val homeAgenda: Boolean = true,
     /** Navegação: a ilha abre sozinha por um instante quando muda a próxima instrução. */
     val navAutoExpand: Boolean = true,
     /** Ajuste fino do tempo da gravação/cronômetro (ms; positivo adianta). */

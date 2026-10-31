@@ -41,7 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
-enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe, Live, Controls }
+enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe, Live, Controls, Home }
 
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
@@ -200,6 +200,16 @@ class IslandService : AccessibilityService() {
             }
         }
         scope.launch { ui.expanded.collect { scheduleSleep() } }
+        // Clima e agenda da ilha principal: atualiza de tempos em tempos (o clima só a cada 30 min).
+        scope.launch {
+            while (true) {
+                if (!locked.value) {
+                    Weather.refresh(this@IslandService)
+                    Agenda.refresh(this@IslandService)
+                }
+                delay(5 * 60_000)
+            }
+        }
         scope.launch { ui.asleep.collect { applyVisibility() } }
         // Barrinhas que reagem ao som: o Visualizer só fica ligado enquanto a música toca.
         scope.launch {
@@ -617,14 +627,11 @@ class IslandService : AccessibilityService() {
     private fun kindForNow(): ExpandKind {
         if (IslandBus.call.value != null || IslandBus.live.value != null || IslandBus.media.value != null) return ExpandKind.Activity
         if (ui.popup.value is Popup.Charging) return ExpandKind.Battery
+        // Ilha parada abre a ilha principal (hora, clima, saúde, agenda); notificações só pelo botão dela.
         return when (Prefs.state.value.idleStyle) {
             IdleStyle.Battery -> ExpandKind.Battery
-            IdleStyle.Clock, IdleStyle.Date, IdleStyle.ClockBattery, IdleStyle.Alarm, IdleStyle.Greeting -> ExpandKind.Clock
-            IdleStyle.NetSpeed, IdleStyle.Memory, IdleStyle.Storage -> ExpandKind.System
-            IdleStyle.AppIcons, IdleStyle.Count -> ExpandKind.Notifications
-            IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Bedtime -> ExpandKind.Health
             IdleStyle.Breathing -> ExpandKind.Breathe
-            IdleStyle.Simple, IdleStyle.Pulse -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Controls else ExpandKind.Notifications
+            else -> ExpandKind.Home
         }
     }
 

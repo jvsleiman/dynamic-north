@@ -59,9 +59,11 @@ data class CallInfo(
     val appName: String = "",
     /** Botões que o próprio app oferece na chamada (mudo, alto-falante, vídeo…), sem o de atender. */
     val actions: List<NotifAction> = emptyList(),
+    /** Reunião de vídeo (Meet, Zoom, Teams). */
+    val video: Boolean = false,
 )
 
-enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip }
+enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip, Workout }
 
 /** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
 data class LiveInfo(

@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Videocam
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.CallEnd
@@ -143,7 +144,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
-    Volume(false), ExpandedControls(true), Status(false), Done(true),
+    Volume(false), ExpandedControls(true), Status(false), Done(true), ExpandedHome(true),
 }
 
 @Composable
@@ -164,6 +165,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val offsetX by state.offsetXPx.collectAsState()
     val focus by state.focus.collectAsState()
     val thread by state.thread.collectAsState()
+    val weatherNow by Weather.now.collectAsState()
+    val agendaNow by Agenda.now.collectAsState()
 
     // Atividades ao mesmo tempo: a principal fica na ilha e a outra na bolinha.
     // Tocar na bolinha troca as duas (focus).
@@ -188,6 +191,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
         expanded && kind == ExpandKind.Health -> Mode.ExpandedHealth
         expanded && kind == ExpandKind.Breathe -> Mode.ExpandedBreathe
+        expanded && kind == ExpandKind.Home -> Mode.ExpandedHome
         expanded && notifs.isNotEmpty() -> Mode.ExpandedList
         expanded && media != null -> Mode.ExpandedMedia
         expanded -> Mode.ExpandedBattery
@@ -255,18 +259,20 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Volume -> baseW + grow + 90.dp to baseH
         Mode.Status -> baseW + grow + 96.dp to baseH
         Mode.Done -> wide to 70.dp * k * t
+        Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
-            LiveKind.Navigation, LiveKind.Trip -> 64.dp
+            LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout -> 64.dp
             LiveKind.Recording -> 44.dp
             else -> 28.dp
         } to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
         Mode.ExpandedLive -> wide to live.let { l ->
             when {
-                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
+                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
                 l.kind == LiveKind.Progress -> 78.dp
                 l.kind == LiveKind.Trip -> if (l.actions.isEmpty()) 128.dp else 168.dp
+                l.kind == LiveKind.Workout -> if (l.actions.isEmpty()) 104.dp else 150.dp
                 // Botões redondos ficam ao lado do tempo, na mesma linha.
                 l.kind != LiveKind.Navigation && l.actions.all { actionIcon(it.title) != null } -> if (l.kind == LiveKind.Recording) 112.dp else 94.dp
                 else -> 132.dp
@@ -427,6 +433,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
                         Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
                         Mode.Done -> (popup as? Popup.Done)?.let { DoneBanner(it) }
+                        Mode.ExpandedHome -> HomeCard(s, notifs.size, actions)
                         Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
                         Mode.ExpandedLive -> live?.let { ExpandedLive(it) }
@@ -542,6 +549,7 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp, privac
                 IdleStyle.Greeting -> Text(greetingEmoji(now), fontSize = 12.sp)
                 IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Breathing, IdleStyle.Bedtime ->
                     HealthIdleLeft(style, (h - 18.dp) * ic)
+                IdleStyle.Weather, IdleStyle.Agenda -> WeatherAgendaIdleLeft(style, (h - 16.dp) * ic)
                 else -> {}
             }
         }
@@ -566,6 +574,7 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp, privac
                 IdleStyle.Pulse -> PulseDot()
                 IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Breathing, IdleStyle.Bedtime ->
                     HealthIdleRight(style, now, h)
+                IdleStyle.Weather, IdleStyle.Agenda -> WeatherAgendaIdleRight(style, now)
                 else -> {}
             }
         }
@@ -681,6 +690,16 @@ private fun CompactCall(c: CallInfo, wave: Color) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        if (c.video) {
+            // Reunião: ponto vermelho e tempo; câmera na direita.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Red))
+                Spacer(Modifier.width(6.dp))
+                Timer(c.startedAt, LocalIslandColors.current.text, 12)
+            }
+            Icon(Icons.Rounded.Videocam, null, tint = LocalIslandColors.current.text, modifier = Modifier.size(18.dp))
+            return@Row
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.Call, null, tint = Green, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
@@ -884,8 +903,50 @@ private fun IncomingCall(c: CallInfo) {
     }
 }
 
+/** Reunião (Meet, Zoom): tempo, nome grande, botões do app e a foto na direita. */
+@Composable
+private fun ExpandedVideoCall(c: CallInfo, actions: IslandActions) {
+    val col = LocalIslandColors.current
+    Row(Modifier.fillMaxSize().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Red))
+                Spacer(Modifier.width(6.dp))
+                Timer(c.startedAt, col.text, 13)
+                if (c.appName.isNotBlank()) Text(" · ${c.appName}", color = col.dim, fontSize = 12.sp, maxLines = 1)
+            }
+            Text(c.name, color = col.text, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                c.actions.take(4).forEach { a ->
+                    val mapped = actionIcon(a.title)
+                    val end = mapped?.first == Icons.Rounded.CallEnd
+                    if (mapped != null) {
+                        RoundButton(mapped.first, if (end) Red else Color(0xFF3A3A3C), 42.dp) {
+                            runCatching { a.intent.send() }
+                            if (end) actions.onCollapse()
+                        }
+                    } else {
+                        Box(
+                            Modifier.height(42.dp).clip(RoundedCornerShape(21.dp)).background(Color(0xFF3A3A3C))
+                                .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                                .padding(horizontal = 12.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { Text(a.title, color = Color.White, fontSize = 12.sp, maxLines = 1) }
+                    }
+                }
+            }
+        }
+        c.photo?.let { p ->
+            Spacer(Modifier.width(12.dp))
+            Image(remember(p) { p.asImageBitmap() }, null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 88.dp, height = 100.dp).clip(RoundedCornerShape(18.dp)))
+        }
+    }
+}
+
 @Composable
 private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
+    if (c.video) return ExpandedVideoCall(c, actions)
     val col = LocalIslandColors.current
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {

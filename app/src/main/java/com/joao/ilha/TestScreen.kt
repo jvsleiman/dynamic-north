@@ -195,6 +195,29 @@ object Demo {
         )
     }
 
+    fun meeting(ctx: Context) {
+        IslandBus.call.value = CallInfo(
+            key = "demo-call", pkg = ctx.packageName, name = "Reunião semanal", photo = avatar("R", 0xFF0B8043.toInt()),
+            incoming = false, startedAt = System.currentTimeMillis(), answer = null, decline = null, contentIntent = openApp(ctx),
+            appName = "Meet", video = true,
+            actions = listOf(NotifAction("Mudo", openApp(ctx), null), NotifAction("Câmera", openApp(ctx), null), NotifAction("Sair da chamada", openApp(ctx), null)),
+        )
+    }
+
+    fun workout(ctx: Context) {
+        IslandBus.live.value = LiveInfo(
+            "demo-live", ctx.packageName, LiveKind.Workout, "Corrida", "2,35 km · 6'32\"/km", null, System.currentTimeMillis() - 15 * 60_000, false, null,
+            listOf(NotifAction("Pausar", openApp(ctx), null), NotifAction("Encerrar", openApp(ctx), null)),
+            appName = "Strava", smallIcon = icon(ctx), color = 0xFFFC4C02.toInt(),
+        )
+    }
+
+    /** Clima de exemplo, só se ainda não houver o de verdade. */
+    fun weather() {
+        if (Weather.now.value != null) return
+        Weather.now.value = WeatherInfo(28, 2, true, listOf(HourForecast(11, 2, 29, true), HourForecast(12, 61, 30, true), HourForecast(13, 63, 31, true), HourForecast(14, 2, 29, true)), System.currentTimeMillis())
+    }
+
     fun endCall() {
         IslandBus.call.value = null
         IslandBus.refresh?.invoke()
@@ -210,7 +233,7 @@ object Demo {
             LiveKind.Alarm -> LiveInfo("demo-live", ctx.packageName, kind, "Alarme", "07:00 · Acordar", null, 0, false, null, listOf(NotifAction("Soneca", openApp(ctx), null), NotifAction("Parar", openApp(ctx), null)))
             LiveKind.Navigation -> LiveInfo("demo-live", ctx.packageName, kind, "200 m", "Vire à direita na Av. Paulista", null, 0, false, null, listOf(NotifAction("Sair", openApp(ctx), null)))
             LiveKind.Recording -> LiveInfo("demo-live", ctx.packageName, kind, "Gravação 2", "", null, now, false, null, listOf(NotifAction("Parar", openApp(ctx), null), NotifAction("Pausar", openApp(ctx), null)))
-            LiveKind.Progress, LiveKind.Trip -> null
+            LiveKind.Progress, LiveKind.Trip, LiveKind.Workout -> null
         }
     }
 
@@ -283,6 +306,9 @@ fun TestScreen(back: () -> Unit) {
                         4_000L to { Demo.live(ctx, LiveKind.Alarm) },
                         6_500L to { Demo.stopLive(); Demo.download(ctx, scope) },
                         4_000L to { Demo.trip(ctx) },
+                        4_000L to { Demo.workout(ctx) },
+                        4_000L to { Demo.stopLive(); Demo.meeting(ctx) },
+                        5_000L to { Demo.endCall(); Demo.weather(); IslandBus.expand?.invoke(ExpandKind.Home) },
                         3_500L to { Demo.stopLive(); IslandBus.show(Popup.Charging(ChargingInfo(72, true))) },
                         3_500L to { IslandBus.show(Popup.Bluetooth(BluetoothInfo("Fones de ouvido", BtKind.Earbuds, true, 80))) },
                         3_500L to { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) },
@@ -310,6 +336,7 @@ fun TestScreen(back: () -> Unit) {
         Group("Chamada") {
             NavRow("Chamada recebida", icon = Icons.Rounded.Call, iconColor = SwitchGreen) { Demo.call(ctx, true) }
             NavRow("Chamada em andamento") { Demo.call(ctx, false) }
+            NavRow("Reunião (Meet, Zoom)") { Demo.meeting(ctx) }
             NavRow("Encerrar chamada", divider = false) { Demo.endCall() }
         }
         Group("Ao vivo") {
@@ -318,6 +345,7 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Gravação de tela") { Demo.live(ctx, LiveKind.Recording) }
             NavRow("Download") { Demo.download(ctx, scope) }
             NavRow("Corrida") { Demo.trip(ctx) }
+            NavRow("Treino (Strava, Google Fit)") { Demo.workout(ctx) }
             NavRow("Navegação", icon = Icons.Rounded.Navigation, iconColor = Color(0xFF0A84FF)) { Demo.live(ctx, LiveKind.Navigation) }
             NavRow("Alarme tocando", icon = Icons.Rounded.Alarm, iconColor = Color(0xFFFF9500)) { Demo.live(ctx, LiveKind.Alarm) }
             NavRow("Parar ao vivo", divider = false) { Demo.stopLive() }
@@ -336,6 +364,7 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Aviso de teste", divider = false) { IslandBus.show(Popup.Test) }
         }
         Group("Ilha aberta", footer = "Abre a ilha grande direto no layout escolhido.") {
+            NavRow("Ilha principal") { Demo.weather(); IslandBus.expand?.invoke(ExpandKind.Home) }
             NavRow("Controles rápidos", icon = Icons.Rounded.Tune, iconColor = Color(0xFF0A84FF)) { IslandBus.expand?.invoke(ExpandKind.Controls) }
             NavRow("Relógio") { IslandBus.expand?.invoke(ExpandKind.Clock) }
             NavRow("Bateria") { IslandBus.expand?.invoke(ExpandKind.Battery) }

@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CallEnd
 import androidx.compose.material.icons.rounded.Check
@@ -83,6 +84,7 @@ private fun LiveInfo.vector(): ImageVector = when (kind) {
     LiveKind.Recording -> RecordIcon
     LiveKind.Progress -> Icons.Rounded.Download
     LiveKind.Trip -> Icons.Rounded.DirectionsCar
+    LiveKind.Workout -> Icons.AutoMirrored.Rounded.DirectionsRun
 }
 
 private fun LiveInfo.tint(): Color = when (kind) {
@@ -90,6 +92,7 @@ private fun LiveInfo.tint(): Color = when (kind) {
     LiveKind.Recording -> RecColor
     LiveKind.Progress -> CamColor
     LiveKind.Trip -> if (color != 0) Color(color).copy(alpha = 1f) else NavColor
+    LiveKind.Workout -> if (color != 0) Color(color).copy(alpha = 1f) else Color(0xFFFC4C02)
     else -> TimerColor
 }
 
@@ -153,6 +156,10 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
                 AppGlyph(l, (h - 12.dp) * ic)
                 ProgressRing(l.progress, CamColor, h - 12.dp, 2.5.dp)
             }
+            LiveKind.Workout -> {
+                Icon(l.vector(), null, tint = l.tint(), modifier = Modifier.size((h - 12.dp) * ic))
+                Text(workoutMetrics(l).firstOrNull() ?: liveTime(l), color = l.tint(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            }
             LiveKind.Trip -> {
                 AppGlyph(l, (h - 12.dp) * ic)
                 Text(shortTrip(l), color = col.text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -207,7 +214,57 @@ internal fun ExpandedLive(l: LiveInfo) {
         LiveKind.Navigation -> ExpandedNav(l)
         LiveKind.Progress -> ExpandedProgress(l)
         LiveKind.Trip -> ExpandedTrip(l)
+        LiveKind.Workout -> ExpandedWorkout(l)
         else -> ExpandedTimer(l)
+    }
+}
+
+/** "2,35 km · 15:20 · 6'32\"/km" → partes; o tempo do cronômetro vem primeiro quando existe. */
+@Composable
+private fun workoutMetrics(l: LiveInfo): List<String> {
+    val parts = "${l.text}".split(Regex("\\s*[·•|\\n]\\s*|,\\s+(?=\\d)")).map { it.trim() }.filter { it.isNotBlank() }
+    return (if (l.chronoBase > 0) listOf(liveTime(l)) else emptyList()) + parts
+}
+
+/** Treino: logo do app, métricas em colunas e os botões do app (pausar em destaque). */
+@Composable
+private fun ExpandedWorkout(l: LiveInfo) {
+    val col = LocalIslandColors.current
+    val metrics = workoutMetrics(l).take(3)
+    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AppGlyph(l, 26.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(l.title.ifBlank { l.appName }, color = col.text, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            if (metrics.isEmpty()) Text(liveTime(l), color = l.tint(), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            metrics.forEachIndexed { i, m ->
+                Text(m, color = if (i == 0) l.tint() else col.text, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
+            }
+        }
+        if (l.actions.isNotEmpty()) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                l.actions.forEach { a ->
+                    val mapped = actionIcon(a.title)
+                    val strong = mapped?.second == true
+                    Box(
+                        Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(if (strong) l.tint() else col.text.copy(alpha = 0.16f))
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                            .padding(horizontal = if (mapped != null && !strong) 10.dp else 18.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (mapped != null) Icon(mapped.first, null, tint = if (strong) Color.White else col.text, modifier = Modifier.size(20.dp))
+                            if (mapped == null || strong) {
+                                if (mapped != null) Spacer(Modifier.width(6.dp))
+                                Text(a.title, color = if (strong) Color.White else col.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
