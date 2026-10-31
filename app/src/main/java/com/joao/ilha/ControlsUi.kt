@@ -12,7 +12,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
+import android.provider.Settings as Sys
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -95,26 +95,26 @@ internal fun ControlsCard(s: Settings, actions: IslandActions) {
     val btOn = remember(tick) { runCatching { (ctx.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter?.isEnabled == true }.getOrDefault(false) }
     val dndOn = remember(tick) { nm.currentInterruptionFilter > NotificationManager.INTERRUPTION_FILTER_ALL }
     val ringer = remember(tick) { am.ringerMode }
-    val rotation = remember(tick) { Settings.System.getInt(ctx.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1 }
+    val rotation = remember(tick) { Sys.System.getInt(ctx.contentResolver, Sys.System.ACCELEROMETER_ROTATION, 0) == 1 }
 
     fun open(i: Intent) {
         runCatching { ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         actions.onCollapse()
     }
-    fun askWriteSettings() = open(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}")))
-    fun askDnd() = open(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+    fun askWriteSettings() = open(Intent(Sys.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}")))
+    fun askDnd() = open(Intent(Sys.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Toggle(Icons.Rounded.FlashlightOn, "Lanterna", torch.on) { torch.toggle() }
             Toggle(Icons.Rounded.Wifi, "Wi‑Fi", wifiOn) {
-                if (Build.VERSION.SDK_INT >= 29) open(Intent(Settings.Panel.ACTION_WIFI))
+                if (Build.VERSION.SDK_INT >= 29) open(Intent(Sys.Panel.ACTION_WIFI))
                 else {
                     toggleWifiLegacy(ctx)
                     tick++
                 }
             }
-            Toggle(Icons.Rounded.Bluetooth, "Bluetooth", btOn) { open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS)) }
+            Toggle(Icons.Rounded.Bluetooth, "Bluetooth", btOn) { open(Intent(Sys.ACTION_BLUETOOTH_SETTINGS)) }
             Toggle(Icons.Rounded.DoNotDisturbOn, "Não perturbe", dndOn) {
                 if (!nm.isNotificationPolicyAccessGranted) askDnd()
                 else {
@@ -138,9 +138,9 @@ internal fun ControlsCard(s: Settings, actions: IslandActions) {
                 tick++
             }
             Toggle(Icons.Rounded.ScreenRotation, "Girar", rotation) {
-                if (!Settings.System.canWrite(ctx)) askWriteSettings()
+                if (!Sys.System.canWrite(ctx)) askWriteSettings()
                 else {
-                    Settings.System.putInt(ctx.contentResolver, Settings.System.ACCELEROMETER_ROTATION, if (rotation) 0 else 1)
+                    Sys.System.putInt(ctx.contentResolver, Sys.System.ACCELEROMETER_ROTATION, if (rotation) 0 else 1)
                     tick++
                 }
             }
@@ -208,16 +208,16 @@ private fun LevelBar(icon: ImageVector, value: Float, onChange: (Float) -> Unit)
 private fun BrightnessBar(onNeedPermission: () -> Unit) {
     val ctx = LocalContext.current
     val cr = ctx.contentResolver
-    var v by remember { mutableFloatStateOf(Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS, 128) / 255f) }
+    var v by remember { mutableFloatStateOf(Sys.System.getInt(cr, Sys.System.SCREEN_BRIGHTNESS, 128) / 255f) }
     LevelBar(Icons.Rounded.BrightnessMedium, v) { f ->
-        if (!Settings.System.canWrite(ctx)) {
+        if (!Sys.System.canWrite(ctx)) {
             onNeedPermission()
             return@LevelBar
         }
         v = f.coerceIn(0f, 1f)
         runCatching {
-            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-            Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, (v * 255).roundToInt().coerceIn(1, 255))
+            Sys.System.putInt(cr, Sys.System.SCREEN_BRIGHTNESS_MODE, Sys.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+            Sys.System.putInt(cr, Sys.System.SCREEN_BRIGHTNESS, (v * 255).roundToInt().coerceIn(1, 255))
         }
     }
 }
