@@ -55,7 +55,7 @@ private const val STRIDES_PER_SEC = 2.4f
 
 /**
  * Animação da ilha aberta: paisagem noturna em pontinhos (estrelas, lua, montanhas, pinheiros) passando
- * enquanto um cavalo galopa no ritmo do chão. No fim o cavalo sai pela direita e aparece "Notch".
+ * enquanto um cavalo galopa no ritmo do chão. No fim o cavalo sai pela direita e "NOTCH" acende em pontinhos.
  */
 @Composable
 fun IntroScene() {
@@ -64,26 +64,64 @@ fun IntroScene() {
         val start = withFrameMillis { it }
         while (t < INTRO_MS / 1000f) withFrameMillis { t = (it - start) / 1000f }
     }
-    val titleA = ((t - 4.3f) / 0.5f).coerceIn(0f, 1f)
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize().alpha((t / 0.35f).coerceIn(0f, 1f) * (1f - 0.7f * titleA))) { drawScene(t) }
-        Text("Notch", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold, modifier = Modifier.alpha(titleA))
+    val bg = LocalIslandColors.current.bg
+    val titleA = ((t - 4.2f) / 0.6f).coerceIn(0f, 1f)
+    Box(Modifier.fillMaxSize()) {
+        Canvas(Modifier.fillMaxSize().alpha((t / 0.35f).coerceIn(0f, 1f) * (1f - 0.75f * titleA))) { drawScene(t, bg) }
+        if (t > 4.2f) Canvas(Modifier.fillMaxSize()) { drawTitle(t - 4.2f) }
     }
 }
 
-private fun DrawScope.drawScene(t: Float) {
+private fun DrawScope.grid(): Triple<Float, Int, Int> {
     val step = 3.5.dp.toPx()
+    return Triple(step, (size.width / step).toInt(), (size.height / step).toInt())
+}
+
+/** Letras 5×7 em pontos. */
+private val Glyphs = mapOf(
+    'N' to listOf("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
+    'O' to listOf("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
+    'T' to listOf("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    'C' to listOf("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
+    'H' to listOf("10001", "10001", "10001", "11111", "10001", "10001", "10001"),
+)
+
+/** "NOTCH" acendendo ponto a ponto, no mesmo estilo da cena. */
+private fun DrawScope.drawTitle(time: Float) {
+    val (step, cols, rows) = grid()
+    val text = "NOTCH"
+    val sc = if (cols >= 64 && rows >= 20) 2 else 1
+    val w = (text.length * 6 - 1) * sc
+    val left = (cols - w) / 2
+    val top = (rows - 7 * sc) / 2
+    val r = step * 0.36f
+    text.forEachIndexed { i, ch ->
+        val g = Glyphs[ch] ?: return@forEachIndexed
+        g.forEachIndexed { gy, line ->
+            line.forEachIndexed { gx, bit ->
+                if (bit != '1') return@forEachIndexed
+                for (sy in 0 until sc) for (sx in 0 until sc) {
+                    val x = left + (i * 6 + gx) * sc + sx
+                    val y = top + gy * sc + sy
+                    // Cada ponto acende num instante, da esquerda para a direita, com um brilho rápido.
+                    val h = ((x * 73 + y * 151) % 97) / 97f
+                    val on = time - (x - left) / w.toFloat() * 0.45f - h * 0.2f
+                    if (on <= 0f) continue
+                    val flash = if (on < 0.12f) 1.6f - on * 5f else 1f
+                    val a = (on / 0.12f).coerceIn(0f, 1f)
+                    drawCircle(Dot.copy(alpha = a), r * flash.coerceAtLeast(1f), Offset((x + 0.5f) * step, (y + 0.5f) * step))
+                }
+            }
+        }
+    }
+}
+
+private fun DrawScope.drawScene(t: Float, bg: Color) {
+    val (step, cols, rows) = grid()
     val r = step * 0.34f
-    val cols = (size.width / step).toInt()
-    val rows = (size.height / step).toInt()
     if (cols < 10 || rows < 12) return
     fun dot(cx: Int, cy: Int, c: Color, a: Float = 1f) {
         if (cx in 0 until cols && cy in 0 until rows) drawCircle(c.copy(alpha = c.alpha * a), r, Offset((cx + 0.5f) * step, (cy + 0.5f) * step))
-    }
-    fun dotF(x: Float, y: Float, c: Color) = dot(x.roundToInt(), y.roundToInt(), c)
-    fun line(x0: Float, y0: Float, x1: Float, y1: Float, c: Color) {
-        val n = (max(abs(x1 - x0), abs(y1 - y0)) * 2f).toInt().coerceAtLeast(1)
-        for (i in 0..n) { val f = i / n.toFloat(); dotF(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, c) }
     }
 
     // Estrelas piscando
@@ -128,53 +166,91 @@ private fun DrawScope.drawScene(t: Float) {
     // Cavalo: entra pela esquerda, galopa no meio e sai pela direita no fim.
     val enter = (t / 1.1f).coerceIn(0f, 1f)
     val easeIn = 1f - (1f - enter) * (1f - enter)
-    var cx = -14f + (cols * 0.42f + 14f) * easeIn
+    var cx = -16f + (cols * 0.42f + 16f) * easeIn
     if (t > 3.6f) cx += (t - 3.6f) * (t - 3.6f) * 55f
     val phase = t * STRIDES_PER_SEC * 2f * PI.toFloat()
-    val lift = abs(sin(phase)) * 1.1f
-    val hipY = ground - 7f - lift
-    val cy = hipY - 2f
-    drawHorse(cx, cy, hipY, phase, t, ::dotF, ::line)
+    // Poeira levantada pelas patas, ficando para trás e sumindo.
+    for (i in 0 until 12) {
+        val age = (t * 2.6f + i * 0.383f) % 1f
+        val px = cx - 3f - age * 14f + (i % 3) * 1.3f
+        val py = ground - 1f - age * (1.5f + (i % 4) * 0.6f)
+        dot(px.roundToInt(), py.roundToInt(), Hill, (1f - age) * 0.7f)
+    }
+    drawHorse(cx, ground.toFloat(), phase, t, step, r, cols, rows, bg)
 }
 
-private fun drawHorse(
-    cx: Float, cy: Float, hipY: Float, phase: Float, t: Float,
-    dot: (Float, Float, Color) -> Unit,
-    line: (Float, Float, Float, Float, Color) -> Unit,
-) {
-    val c = Dot
-    // Patas (galope: as de trás e as da frente em pares defasados)
-    fun leg(hx: Float, off: Float) {
-        val p = phase + off
-        val th = 0.5f * sin(p)
-        val fold = max(0f, cos(p)) * 1.15f
-        val kx = hx + 3.2f * sin(th); val ky = hipY + 3.2f * cos(th)
-        val ph = th - fold
-        val fx = kx + 3.2f * sin(ph); val fy = ky + 3.2f * cos(ph)
-        line(hx, hipY, kx, ky, c)
-        line(kx, ky, fx, fy, c)
+/** Cavalo desenhado em pontos, com galope, corpo balançando, crina e rabo ao vento. */
+private fun DrawScope.drawHorse(cx: Float, ground: Float, phase: Float, t: Float, step: Float, r: Float, cols: Int, rows: Int, bg: Color) {
+    val lift = max(0f, sin(phase - 0.5f)) * 1.6f
+    val cy = ground - 8.6f - lift
+    val pitch = 0.07f * sin(phase + 0.4f)
+    val cp = cos(pitch); val sp = sin(pitch)
+    val drawn = HashSet<Long>()
+    fun p(lx: Float, ly: Float, c: Color = Dot, a: Float = 1f) {
+        val x = (cx + lx * cp - ly * sp).roundToInt()
+        val y = (cy + lx * sp + ly * cp).roundToInt()
+        if (x !in 0 until cols || y !in 0 until rows) return
+        if (!drawn.add(x.toLong() shl 32 or (y.toLong() and 0xffffffffL)) && c == Dot) return
+        drawCircle(c.copy(alpha = c.alpha * a), if (c == Dot) r else r * 1.2f, Offset((x + 0.5f) * step, (y + 0.5f) * step))
     }
-    leg(cx - 4.5f, 0.5f)
-    leg(cx + 4.5f, 3.1f)
-    // Corpo
-    for (y in -3..3) for (x in -8..8) {
-        val nx = x / 7f; val ny = y / 2.6f
-        if (nx * nx + ny * ny <= 1f) dot(cx + x, cy + y, c)
+    fun line(x0: Float, y0: Float, x1: Float, y1: Float) {
+        val n = (max(abs(x1 - x0), abs(y1 - y0)) * 2f).toInt().coerceAtLeast(1)
+        for (i in 0..n) { val f = i / n.toFloat(); p(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f) }
     }
-    leg(cx - 5.5f, 0f)
-    leg(cx + 5.5f, 2.6f)
-    // Pescoço e cabeça (balançam um pouco com o passo)
-    val bob = sin(phase + 1f) * 0.6f
-    line(cx + 4f, cy - 1f, cx + 8f, cy - 6f + bob, c)
-    line(cx + 5f, cy - 1f, cx + 9f, cy - 6f + bob, c)
-    line(cx + 6f, cy, cx + 9.5f, cy - 5f + bob, c)
-    line(cx + 8f, cy - 7f + bob, cx + 12.5f, cy - 4.5f + bob, c)
-    line(cx + 8.5f, cy - 6f + bob, cx + 12f, cy - 3.8f + bob, c)
-    dot(cx + 8f, cy - 8.2f + bob, c)
-    // Crina e rabo ao vento
-    for (i in 0..4) dot(cx + 3.6f + i * 0.9f - 1f, cy - 2f - i * 1.2f + bob + sin(t * 14f + i) * 0.4f, c)
-    for (i in 1..6) {
-        val wave = sin(t * 13f - i * 0.8f) * 0.7f * i / 6f
-        dot(cx - 7.5f - i, cy - 1.5f + i * 0.45f + wave, c)
+    fun thick(x0: Float, y0: Float, x1: Float, y1: Float, w0: Float, w1: Float) {
+        val len = kotlin.math.hypot(x1 - x0, y1 - y0).coerceAtLeast(0.01f)
+        val nx = -(y1 - y0) / len; val ny = (x1 - x0) / len
+        val n = (len * 2f).toInt().coerceAtLeast(1)
+        for (i in 0..n) {
+            val f = i / n.toFloat()
+            val w = w0 + (w1 - w0) * f
+            var o = -w / 2f
+            while (o <= w / 2f) { p(x0 + (x1 - x0) * f + nx * o, y0 + (y1 - y0) * f + ny * o); o += 0.5f }
+        }
+    }
+    fun ellipse(ex: Float, ey: Float, rx: Float, ry: Float) {
+        var y = -ry
+        while (y <= ry) { var x = -rx; while (x <= rx) { if ((x / rx) * (x / rx) + (y / ry) * (y / ry) <= 1f) p(ex + x, ey + y); x += 0.5f }; y += 0.5f }
+    }
+    // Patas: dianteiras dobram o joelho para trás, traseiras têm o jarrete; pares defasados (galope).
+    fun leg(hx: Float, off: Float, hind: Boolean) {
+        val ph = phase + off
+        val th = 0.52f * sin(ph)
+        val fold = max(0f, cos(ph)) * 1.2f
+        val a1 = if (hind) th + 0.3f else th
+        val kx = hx + 3.3f * sin(a1); val ky = 1.8f + 3.3f * cos(a1)
+        val a2 = if (hind) th - 0.35f - fold * 0.9f else th - fold
+        val fx = kx + 3.3f * sin(a2); val fy = ky + 3.3f * cos(a2)
+        line(hx, 1.8f, kx, ky)
+        line(kx, ky, fx, fy)
+        p(fx + 0.6f, fy) // casco
+    }
+    leg(-4.2f, 0.5f, true)
+    leg(4.8f, 3.1f, false)
+    // Corpo: barriga, peito e garupa
+    ellipse(0f, 0f, 7f, 2.6f)
+    ellipse(4.6f, 0.2f, 3.2f, 3f)
+    ellipse(-5f, -0.3f, 2.8f, 2.8f)
+    leg(-5.4f, 0f, true)
+    leg(5.8f, 2.6f, false)
+    // Pescoço e cabeça (sobem e descem com o galope)
+    val bob = sin(phase + 1.1f) * 0.9f
+    thick(5.2f, -1f, 8.6f, -6.6f + bob, 4f, 2.2f)
+    thick(8.4f, -7f + bob, 13f, -4.3f + bob, 2.8f, 1.6f)
+    p(8.1f, -9.1f + bob); p(8.9f, -9.4f + bob); p(8.5f, -8.3f + bob)
+    p(10.1f, -6.6f + bob, bg) // olho
+    // Narina soltando vapor de vez em quando
+    val puff = (t * 1.2f) % 1f
+    if (puff < 0.5f) for (i in 0..2) p(13.6f + puff * 4f + i * 0.7f, -4.3f + bob - puff * 2f - i * 0.4f, Hill, (0.5f - puff) * 1.4f)
+    // Crina ao vento
+    for (i in 0..6) {
+        val bx = 4.6f + i * 0.62f; val by = -1.8f - i * 0.82f + bob * (i / 6f)
+        val wave = sin(t * 15f + i * 0.9f) * 0.6f
+        p(bx - 1f, by + wave * 0.3f); p(bx - 2f, by + 0.3f + wave)
+    }
+    // Rabo: três fios ondulando, mais erguido quando ele corre
+    for (s in 0..2) for (j in 1..7) {
+        val wave = sin(t * 12f - j * 0.75f + s) * 0.8f * j / 7f
+        p(-7.6f - j * 0.95f, -1.6f + j * (0.25f + s * 0.12f) + wave)
     }
 }
