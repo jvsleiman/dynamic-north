@@ -533,6 +533,7 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp, privac
     LaunchedEffect(style) {
         val live = style != IdleStyle.Simple && style != IdleStyle.AppIcons && style != IdleStyle.Count && style != IdleStyle.Pulse
         while (live) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             battery = batteryNow(ctx)
             if (style == IdleStyle.NetSpeed) netSpeed = NetMeter.sample()
@@ -634,6 +635,7 @@ private fun SystemCard() {
     var tick by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
+            IslandBus.awaitScreenOn()
             speed = NetMeter.sample()
             tick++
             delay(1000)
@@ -695,7 +697,8 @@ private fun CompactMedia(m: MediaInfo, h: Dp) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Art(m.art?.asImageBitmap(), h - 10.dp, CircleShape, spinning = m.playing)
+        // Sem girar: a capa girando redesenhava a ilha 60 vezes por segundo o tempo todo.
+        Art(remember(m.art) { m.art?.asImageBitmap() }, h - 10.dp, CircleShape)
         Bars(m.playing, artAccent(m.art), Modifier.size(h - 12.dp))
     }
 }
@@ -1138,6 +1141,7 @@ private fun Progress(m: MediaInfo) {
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(m.playing) {
         while (m.playing) {
+            IslandBus.awaitScreenOn()
             now = SystemClock.elapsedRealtime()
             delay(500)
         }
@@ -1225,6 +1229,7 @@ private fun Timer(startedAt: Long, color: Color, size: Int) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(startedAt) {
         while (true) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             // Troca o número logo depois da virada de cada segundo da chamada.
             delay(1000 - Math.floorMod(now - startedAt, 1000L) + 5)
@@ -1296,6 +1301,7 @@ private fun ClockCard() {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             delay(1000)
         }
@@ -1417,8 +1423,9 @@ private fun Bars(playing: Boolean, color: Color, modifier: Modifier) {
     var tick by remember { mutableLongStateOf(0L) }
     LaunchedEffect(playing, real) {
         while (playing && !real) {
+            IslandBus.awaitScreenOn()
             tick++
-            delay(140)
+            delay(260)
         }
     }
     Row(modifier, horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {

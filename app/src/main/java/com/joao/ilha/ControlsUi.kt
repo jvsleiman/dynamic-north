@@ -87,6 +87,7 @@ internal fun ControlsCard(s: Settings, actions: IslandActions) {
     // Estado dos botões muda fora do app (painel do sistema): relê a cada segundo.
     LaunchedEffect(Unit) {
         while (true) {
+            IslandBus.awaitScreenOn()
             delay(1000)
             tick++
         }

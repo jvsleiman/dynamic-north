@@ -166,6 +166,7 @@ internal fun HealthCard(s: Settings) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             delay(10_000)
         }

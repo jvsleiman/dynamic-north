@@ -95,10 +95,12 @@ class IslandService : AccessibilityService() {
                 Intent.ACTION_BATTERY_CHANGED -> batteryAlert(i)
                 ACTION_VOLUME -> volumeChanged(i)
                 Intent.ACTION_SCREEN_OFF -> {
+                    IslandBus.screenOn.value = false
                     locked.value = true
                     Health.screenOff()
                 }
                 Intent.ACTION_SCREEN_ON -> {
+                    IslandBus.screenOn.value = true
                     locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
                     if (!locked.value) Health.screenOn()
                 }
@@ -215,7 +217,8 @@ class IslandService : AccessibilityService() {
         scope.launch { ui.asleep.collect { applyVisibility() } }
         // Barrinhas que reagem ao som: o Visualizer só fica ligado enquanto a música toca.
         scope.launch {
-            combine(IslandBus.media, Prefs.state) { m, st -> m?.playing == true && st.reactiveBars }.collect { on ->
+            // Só com a tela acesa: o Visualizer ligado com a tela apagada gastava bateria à toa.
+            combine(IslandBus.media, Prefs.state, IslandBus.screenOn) { m, st, on -> m?.playing == true && st.reactiveBars && on }.collect { on ->
                 if (on) AudioLevels.start(this@IslandService) else AudioLevels.stop()
             }
         }
@@ -223,6 +226,7 @@ class IslandService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
+        if (!IslandBus.screenOn.value) return
         if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
         // Com vídeo em janelinha (PiP), o app do vídeo continua mandando eventos mesmo estando em
         // segundo plano. Por isso o app "aberto" vem da lista de janelas, ignorando a janela PiP.

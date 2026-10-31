@@ -72,6 +72,7 @@ internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             delay(60_000 - System.currentTimeMillis() % 60_000 + 20)
         }

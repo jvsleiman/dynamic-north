@@ -7,6 +7,7 @@ import android.media.session.MediaController
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 
 /** Botão de uma notificação; com [remoteInput] é uma resposta rápida. */
 data class NotifAction(val title: String, val intent: PendingIntent, val remoteInput: android.app.RemoteInput?)
@@ -132,6 +133,13 @@ object IslandBus {
 
     /** Música/vídeo tirado da ilha com o arraste longo ("app|título"); volta se mudar de faixa ou voltar a tocar. */
     @Volatile var hiddenMedia: String? = null
+
+    /** Tela acesa. Com a tela apagada, relógios e animações da ilha param para poupar bateria. */
+    val screenOn = MutableStateFlow(true)
+
+    suspend fun awaitScreenOn() {
+        if (!screenOn.value) screenOn.first { it }
+    }
 
     /** Abre a ilha grande num layout (usado pela tela Testar). */
     @Volatile var expand: ((ExpandKind) -> Unit)? = null

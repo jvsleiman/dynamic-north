@@ -103,6 +103,7 @@ private fun liveTime(l: LiveInfo): String {
     LaunchedEffect(l.chronoBase) {
         // Acorda logo depois de cada virada de segundo, para o número trocar junto com o relógio.
         while (l.chronoBase > 0) {
+            IslandBus.awaitScreenOn()
             now = System.currentTimeMillis()
             val untilNext = if (l.countDown) Math.floorMod(l.chronoBase - now, 1000L) else 1000 - Math.floorMod(now - l.chronoBase, 1000L)
             delay(untilNext.coerceAtLeast(1) + 5)

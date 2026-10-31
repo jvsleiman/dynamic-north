@@ -68,6 +68,7 @@ class NotifListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         lastShown.remove(sbn.key)
+        itemCache.remove(sbn.key)
         firstSeen.remove(sbn.key)
         textBase.remove(sbn.key)
         refresh()
@@ -90,7 +91,7 @@ class NotifListener : NotificationListenerService() {
         IslandBus.notifications.value = list
             .filter { isRegular(it) && it.packageName !in blocked }
             .sortedByDescending { it.postTime }
-            .mapNotNull { toItem(it) }
+            .mapNotNull { cachedItem(it) }
         val s = Prefs.state.value
         IslandBus.call.value = if (!s.callEnabled) null else list
             .filter { isCall(it) }
@@ -214,6 +215,17 @@ class NotifListener : NotificationListenerService() {
                 NotifAction(t, a.actionIntent ?: return@mapNotNull null, null)
             }.take(3),
         )
+    }
+
+    /** Cada atualização relia todas as notificações e suas fotos; agora só as que mudaram. */
+    private val itemCache = HashMap<String, Pair<String, NotifItem?>>()
+
+    private fun cachedItem(sbn: StatusBarNotification): NotifItem? {
+        val sig = "${sbn.postTime}|${Prefs.state.value.showSensitive}"
+        itemCache[sbn.key]?.let { (s, item) -> if (s == sig) return item }
+        val item = toItem(sbn)
+        itemCache[sbn.key] = sig to item
+        return item
     }
 
     private fun toItem(sbn: StatusBarNotification): NotifItem? {
