@@ -84,20 +84,20 @@ object Demo {
 
     fun whatsapp(ctx: Context, group: Boolean) {
         val msgs = if (group) listOf(
-            Msg("Ana", "Alguém vai no churrasco sábado?"),
-            Msg("Pedro", "Eu vou! Levo o carvão"),
-            Msg("Ana", "Fechou, eu levo a salada"),
-            Msg("Lucas", "Que horas começa?"),
+            Msg("Rafael", "Futebol quinta às 20h, quem confirma?"),
+            Msg("Pedro", "Confirmado!"),
+            Msg("Rafael", "Fechou, levo a bola"),
+            Msg("Lucas", "Tô dentro também"),
         ) else listOf(
-            Msg("Marina", "Oi! Tudo bem?"),
-            Msg("Marina", "Viu o vídeo que te mandei?"),
-            Msg("Marina", "Me liga quando puder 😊"),
+            Msg("Carlos (trabalho)", "Bom dia! A reunião passou para as 15h"),
+            Msg("Carlos (trabalho)", "Consegue levar o relatório impresso?"),
+            Msg("Carlos (trabalho)", "Valeu!"),
         )
         val item = NotifItem(
             key = "demo-whats-$group", pkg = PKG_WHATS, appName = "WhatsApp",
-            title = if (group) "Churrasco 🔥" else "Marina",
+            title = if (group) "Futebol de quinta ⚽" else "Carlos (trabalho)",
             text = msgs.last().let { if (group) "${it.sender}: ${it.text}" else it.text },
-            smallIcon = icon(ctx), largeIcon = avatar(if (group) "C" else "Marina", if (group) 0xFFFF9500.toInt() else 0xFF5E5CE6.toInt()),
+            smallIcon = icon(ctx), largeIcon = avatar(if (group) "F" else "Carlos", if (group) 0xFFFF9500.toInt() else 0xFF5E5CE6.toInt()),
             contentIntent = openApp(ctx), postedAt = System.currentTimeMillis(), clearable = true,
             actions = listOf(NotifAction("Marcar como lida", openApp(ctx), null)),
             messages = msgs, color = 0xFF25D366.toInt(),
@@ -184,7 +184,7 @@ object Demo {
 
     fun call(ctx: Context, incoming: Boolean) {
         IslandBus.call.value = CallInfo(
-            key = "demo-call", pkg = ctx.packageName, name = "Marina", photo = avatar("Marina", 0xFF5E5CE6.toInt()),
+            key = "demo-call", pkg = ctx.packageName, name = "Carlos (trabalho)", photo = avatar("Carlos", 0xFF5E5CE6.toInt()),
             incoming = incoming, startedAt = if (incoming) 0 else System.currentTimeMillis(),
             answer = null, decline = null, contentIntent = openApp(ctx),
         )
