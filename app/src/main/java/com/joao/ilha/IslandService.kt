@@ -126,6 +126,12 @@ class IslandService : AccessibilityService() {
         Prefs.init(this)
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         IslandBus.serviceRunning.value = true
+        IslandBus.expand = { kind ->
+            popupJob?.cancel()
+            ui.popup.value = null
+            ui.expandKind.value = kind
+            ui.expanded.value = true
+        }
         locked.value = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED)
@@ -218,6 +224,7 @@ class IslandService : AccessibilityService() {
 
     override fun onDestroy() {
         IslandBus.serviceRunning.value = false
+        IslandBus.expand = null
         runCatching { unregisterReceiver(receiver) }
         AudioLevels.stop()
         Health.stopSteps()

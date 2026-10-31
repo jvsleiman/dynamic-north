@@ -95,7 +95,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Features, Display, Customize, Idle, Live, Controls, ControlsApps, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Features, Test, Display, Customize, Idle, Live, Controls, ControlsApps, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -159,7 +159,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             NavRow("Outras configurações", icon = Icons.Rounded.Settings, iconColor = Color(0xFF8E8E93), divider = false) { go(Screen.Other) }
         }
         Group {
-            NavRow("Testar a ilha", icon = Icons.Rounded.Science, iconColor = Color(0xFF00C7BE)) { IslandBus.show(Popup.Test) }
+            NavRow("Testar a ilha", icon = Icons.Rounded.Science, iconColor = Color(0xFF00C7BE)) { go(Screen.Test) }
             NavRow("Verificar atualização", icon = Icons.Rounded.SystemUpdate, iconColor = Accent) { go(Screen.Update) }
             NavRow("Ajuda", icon = Icons.AutoMirrored.Rounded.HelpOutline, iconColor = Color(0xFF5AC8FA), divider = false) { go(Screen.Help) }
         }

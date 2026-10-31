@@ -114,6 +114,9 @@ object IslandBus {
     /** Relê notificações e player depois de mudar um ajuste (apps bloqueados etc.). */
     @Volatile var refresh: (() -> Unit)? = null
 
+    /** Abre a ilha grande num layout (usado pela tela Testar). */
+    @Volatile var expand: ((ExpandKind) -> Unit)? = null
+
     private val _popups = MutableSharedFlow<Popup>(extraBufferCapacity = 8)
     val popups = _popups.asSharedFlow()
 
