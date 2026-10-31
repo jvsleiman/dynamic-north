@@ -143,8 +143,7 @@ class IslandService : AccessibilityService() {
         watchPrivacy()
         if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
-        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
-        scope.launch { healthReminders() }
+        scope.launch { Prefs.state.collect { reposition(); applyVisibility() } }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
         scope.launch {

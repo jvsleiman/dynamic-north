@@ -39,18 +39,17 @@ enum class IdleStyle(val label: String, val hidden: Boolean = false) {
     Alarm("Próximo alarme"),
     Greeting("Saudação", hidden = true),
     Pulse("Luz pulsando", hidden = true),
-    Health("Saúde (passos e água)"),
+    Health("Saúde (passos e água)", hidden = true),
     Steps("Passos do dia", hidden = true),
     Water("Copos de água", hidden = true),
-    ScreenBreak("Pausa para os olhos"),
-    Breathing("Respiração guiada"),
-    Bedtime("Hora de dormir"),
+    ScreenBreak("Pausa para os olhos", hidden = true),
+    Breathing("Respiração guiada", hidden = true),
+    Bedtime("Hora de dormir", hidden = true),
     ;
 
     /** Estilos tirados da lista (0.9.5) continuam lidos dos ajustes antigos e viram o mais parecido. */
     fun current(): IdleStyle = when (this) {
         Date -> Clock
-        Steps, Water -> Health
         else -> if (hidden) Simple else this
     }
 }
@@ -133,6 +132,8 @@ data class Settings(
     val gameMode: Boolean = true,
     val respectDnd: Boolean = true,
     val recorderEnabled: Boolean = true,
+    /** Ajuste fino do tempo da gravação/cronômetro (ms; positivo adianta). */
+    val liveOffsetMs: Int = 0,
 
     // Ao vivo
     val liveEnabled: Boolean = true,

@@ -170,12 +170,20 @@ class NotifListener : NotificationListenerService() {
                 // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
                 kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
                     // Cada atualização chega igual ou atrasada, nunca adiantada: o menor valor é o início real.
-                    parseElapsed("$title $text")?.let { elapsed ->
-                        val guess = sbn.postTime - elapsed
-                        val best = minOf(textBase[sbn.key] ?: guess, guess)
-                        textBase[sbn.key] = best
-                        best
-                    } ?: if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
+                    // O "when" da notificação, quando o app coloca a hora de início (bem antes da postagem),
+                    // é o início verdadeiro; o texto do gravador às vezes anda 1 s atrás dele.
+                    run {
+                        val explicitWhen = n.`when`.takeIf { it in 1 until sbn.postTime - 1500 }
+                        val fromText = parseElapsed("$title $text")?.let { sbn.postTime - it }
+                        val guess = listOfNotNull(explicitWhen, fromText).minOrNull()
+                        if (guess == null) {
+                            if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
+                        } else {
+                            val best = minOf(textBase[sbn.key] ?: guess, guess)
+                            textBase[sbn.key] = best
+                            best
+                        }
+                    } - Prefs.state.value.liveOffsetMs
                 else -> 0L
             },
             countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),

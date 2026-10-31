@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Bedtime
@@ -94,7 +95,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Display, Customize, Idle, Live, Controls, ControlsApps, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Features, Display, Customize, Idle, Live, Controls, ControlsApps, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -142,15 +143,8 @@ fun HomeScreen(go: (Screen) -> Unit) {
             NavRow("Personalizar layouts") { go(Screen.Customize) }
             NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
-        Group("Recursos") {
-            NavRow("Controles rápidos", null, Icons.Rounded.Tune, Color(0xFF0A84FF)) { go(Screen.Controls) }
-            NavRow("Ao vivo na ilha", onOff(s.liveEnabled || s.navEnabled || s.alarmEnabled), Icons.Rounded.Timer, Color(0xFFFF9500)) { go(Screen.Live) }
-            NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
-            NavRow("Chamada", onOff(s.callEnabled), Icons.Rounded.Call, SwitchGreen) { go(Screen.Calls) }
-            NavRow("Reprodutor de música", onOff(s.musicEnabled), Icons.Rounded.MusicNote, Color(0xFFFF2D55)) { go(Screen.Music) }
-            NavRow("Animação de carregamento", onOff(s.chargingEnabled), Icons.Rounded.BatteryChargingFull, Color(0xFF30B94D)) { go(Screen.Charging) }
-            NavRow("Conexão Bluetooth", onOff(s.bluetoothEnabled), Icons.Rounded.Bluetooth, Accent) { go(Screen.Bluetooth) }
-            NavRow("Borda animada", onOff(s.borderAnim != BorderAnim.Off), Icons.Rounded.Animation, Color(0xFFAF52DE), divider = false) { go(Screen.Border) }
+        Group {
+            NavRow("Recursos", "Notificações, música, controles…", Icons.Rounded.Apps, Color(0xFF5E5CE6), divider = false) { go(Screen.Features) }
         }
         Group {
             NavRow("Toque e segurar", icon = Icons.Rounded.TouchApp, iconColor = Color(0xFFFF9500)) { go(Screen.Gestures) }
@@ -681,6 +675,25 @@ private fun WidthGroup(s: Settings) {
     }
 }
 
+// ---------- recursos ----------
+
+@Composable
+fun FeaturesScreen(back: () -> Unit, go: (Screen) -> Unit) {
+    val s by Prefs.state.collectAsState()
+    Page("Recursos", back) {
+        Group {
+            NavRow("Controles rápidos", null, Icons.Rounded.Tune, Color(0xFF0A84FF)) { go(Screen.Controls) }
+            NavRow("Ao vivo na ilha", onOff(s.liveEnabled || s.navEnabled || s.alarmEnabled), Icons.Rounded.Timer, Color(0xFFFF9500)) { go(Screen.Live) }
+            NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
+            NavRow("Chamada", onOff(s.callEnabled), Icons.Rounded.Call, SwitchGreen) { go(Screen.Calls) }
+            NavRow("Reprodutor de música", onOff(s.musicEnabled), Icons.Rounded.MusicNote, Color(0xFFFF2D55)) { go(Screen.Music) }
+            NavRow("Animação de carregamento", onOff(s.chargingEnabled), Icons.Rounded.BatteryChargingFull, Color(0xFF30B94D)) { go(Screen.Charging) }
+            NavRow("Conexão Bluetooth", onOff(s.bluetoothEnabled), Icons.Rounded.Bluetooth, Accent) { go(Screen.Bluetooth) }
+            NavRow("Borda animada", onOff(s.borderAnim != BorderAnim.Off), Icons.Rounded.Animation, Color(0xFFAF52DE), divider = false) { go(Screen.Border) }
+        }
+    }
+}
+
 // ---------- controles rápidos ----------
 
 @Composable
@@ -734,7 +747,10 @@ fun LiveScreen(back: () -> Unit) {
             SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = false) { v -> s.set { copy(navEnabled = v) } }
         }
         Group(footer = "O Ilha não grava nada: só mostra o tempo enquanto o gravador do celular estiver gravando.") {
-            SwitchRow("Gravação de tela e de voz", s.recorderEnabled, divider = false) { v -> s.set { copy(recorderEnabled = v) } }
+            SwitchRow("Gravação de tela e de voz", s.recorderEnabled) { v -> s.set { copy(recorderEnabled = v) } }
+            SliderRow("Ajuste fino do tempo", s.liveOffsetMs / 100, -15..15, divider = false, format = { v ->
+                if (v == 0) "0 s" else "%+.1f s".format(v / 10f).replace('.', ',')
+            }) { v -> s.set { copy(liveOffsetMs = v * 100) } }
         }
         Group(footer = "Um pontinho verde aparece quando algum app usa a câmera e laranja quando usa o microfone.") {
             SwitchRow("Indicador de câmera e microfone", s.privacyDot, divider = false) { v -> s.set { copy(privacyDot = v) } }
@@ -821,7 +837,6 @@ fun IdleScreen(back: () -> Unit) {
             NavRow("Usando agora", s.idleStyle.label) { scope.launch { pager.animateScrollToPage(styles.indexOf(s.idleStyle)) } }
             NavRow("Testar", divider = false) { IslandBus.show(Popup.Test) }
         }
-        HealthGroup(s)
     }
 }
 

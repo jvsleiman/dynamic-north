@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Music -> MusicScreen(back, go)
                     Screen.Charging -> ChargingScreen(back)
                     Screen.Live -> LiveScreen(back)
+                    Screen.Features -> FeaturesScreen(back, go)
                     Screen.Controls -> ControlsScreen(back, go)
                     Screen.ControlsApps -> AppPickerScreen(
                         "Atalhos de apps", "Aparecem nos controles rápidos da ilha (até 6).",
