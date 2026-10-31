@@ -136,6 +136,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
                 }
             }
         }
+        MissingPermissions(s)
         if (a11y && a11yShortcut) {
             Group(footer = "É o atalho de acessibilidade do Android, não faz parte da ilha. Na tela que abrir, desligue \"Atalho do Notch\" e deixe só \"Usar Notch\" ligado.") {
                 NavRow("Tirar o botão flutuante da lateral", icon = Icons.Rounded.PhoneIphone, iconColor = Color(0xFFFF9500), divider = false) { openA11yDetails(ctx) }
@@ -374,6 +375,31 @@ fun BluetoothScreen(back: () -> Unit) {
                 NavRow("Permitir dispositivos próximos", divider = false) { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }
             }
         }
+    }
+}
+
+/** Permissões que os recursos ligados precisam e que ainda não foram dadas (sem elas o recurso fica mudo). */
+@Composable
+private fun MissingPermissions(s: Settings) {
+    val ctx = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+    var tick by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { tick++ } }
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { tick++ }
+    val wants = buildList {
+        if (s.bluetoothEnabled && Build.VERSION.SDK_INT >= 31) add(Manifest.permission.BLUETOOTH_CONNECT to "Bluetooth (fones conectando)")
+        if (s.reactiveBars) add(Manifest.permission.RECORD_AUDIO to "Barras que seguem a música")
+        if ((s.homeHealth || s.idleStyle == IdleStyle.Health) && Build.VERSION.SDK_INT >= 29) add(Manifest.permission.ACTIVITY_RECOGNITION to "Passos (saúde)")
+        if (s.homeWeather || s.idleStyle == IdleStyle.Weather) add(Manifest.permission.ACCESS_COARSE_LOCATION to "Clima (local aproximado)")
+        if (s.homeAgenda || s.idleStyle == IdleStyle.Agenda) add(Manifest.permission.READ_CALENDAR to "Agenda")
+    }
+    val missing = remember(tick, wants) {
+        wants.filter { ContextCompat.checkSelfPermission(ctx, it.first) != PackageManager.PERMISSION_GRANTED }
+    }
+    if (missing.isEmpty()) return
+    Group("Falta permitir", footer = "Sem essas permissões, o Android não avisa o Notch e esses recursos não aparecem na ilha.") {
+        missing.forEach { (_, label) -> NavRow(label, "Permitir") { ask.launch(missing.map { it.first }.toTypedArray()) } }
+        NavRow("Permitir tudo", divider = false) { ask.launch(missing.map { it.first }.toTypedArray()) }
     }
 }
 

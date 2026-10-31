@@ -80,6 +80,9 @@ class IslandService : AccessibilityService() {
     private val foregroundPkg = MutableStateFlow("")
     private val locked = MutableStateFlow(false)
     private var lastBt: BluetoothInfo? = null
+    private var lastBtEvent = ""
+    private var lastBtAt = 0L
+    private var pending: Pair<Popup, Long>? = null
 
     private var lastDnd = false
     private var lastDndChange = 0L
@@ -127,9 +130,20 @@ class IslandService : AccessibilityService() {
                         show(Popup.Status(if (on) StatusKind.DndOn else StatusKind.DndOff), haptic = false)
                     }
                 }
-                BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED -> if (s.bluetoothEnabled) {
+                BluetoothDevice.ACTION_ACL_CONNECTED, BluetoothDevice.ACTION_ACL_DISCONNECTED, ACTION_A2DP_STATE, ACTION_HEADSET_STATE -> if (s.bluetoothEnabled) {
                     val d = device(i) ?: return
-                    val info = BluetoothInfo(deviceName(d), deviceKind(d), i.action == BluetoothDevice.ACTION_ACL_CONNECTED, null)
+                    val connected = when (i.action) {
+                        BluetoothDevice.ACTION_ACL_CONNECTED -> true
+                        BluetoothDevice.ACTION_ACL_DISCONNECTED -> false
+                        // Fone de áudio: o aviso do perfil (A2DP/headset) é o mais confiável em vários celulares.
+                        else -> when (i.getIntExtra(EXTRA_PROFILE_STATE, -1)) { 2 -> true; 0 -> false; else -> return }
+                    }
+                    val name = deviceName(d)
+                    // Conectar dispara até três avisos (ligação, áudio, chamada): mostra só o primeiro.
+                    val now = System.currentTimeMillis()
+                    if (lastBtEvent == "$name|$connected" && now - lastBtAt < 10_000) return
+                    lastBtEvent = "$name|$connected"; lastBtAt = now
+                    val info = BluetoothInfo(name, deviceKind(d), connected, if (connected) batteryOf(d) else null)
                     lastBt = info
                     show(Popup.Bluetooth(info))
                 }
@@ -170,6 +184,8 @@ class IslandService : AccessibilityService() {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction(ACTION_BT_BATTERY)
+            addAction(ACTION_A2DP_STATE)
+            addAction(ACTION_HEADSET_STATE)
             addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
             addAction(android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
         }
@@ -180,6 +196,15 @@ class IslandService : AccessibilityService() {
         watchPrivacy()
         if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
+        scope.launch {
+            ui.expanded.collect { open ->
+                val p = pending
+                if (!open && p != null) {
+                    pending = null
+                    if (System.currentTimeMillis() - p.second < 20_000) { delay(450); show(p.first) }
+                }
+            }
+        }
         // Depois de cada atualização, a ilha abre uma vez com a animação (com a tela ligada e desbloqueada).
         if (Splash.shouldShow(this)) scope.launch {
             delay(1_500)
@@ -477,7 +502,11 @@ class IslandService : AccessibilityService() {
         if (!test && p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
         if (!test && p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
         if (!test && inGame()) return
-        if (ui.expanded.value && !test) return
+        if (ui.expanded.value && !test) {
+            // Com a ilha aberta o aviso espera e aparece quando ela fechar (não se perde).
+            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done) pending = p to System.currentTimeMillis()
+            return
+        }
         if (test) ui.expanded.value = false
         ui.asleep.value = false
         ui.thread.value = false
@@ -834,6 +863,11 @@ class IslandService : AccessibilityService() {
     private fun deviceName(d: BluetoothDevice): String = runCatching { (if (Build.VERSION.SDK_INT >= 30) d.alias else null) ?: d.name }.getOrNull() ?: "Dispositivo Bluetooth"
 
     @SuppressLint("MissingPermission")
+    /** Bateria que o fone já informou (método escondido do Android; nem todo aparelho tem). */
+    private fun batteryOf(d: BluetoothDevice): Int? = runCatching {
+        (d.javaClass.getMethod("getBatteryLevel").invoke(d) as Int).takeIf { it in 0..100 }
+    }.getOrNull()
+
     private fun deviceKind(d: BluetoothDevice): BtKind {
         val c = runCatching { d.bluetoothClass }.getOrNull() ?: return BtKind.Other
         return when {
@@ -859,6 +893,9 @@ class IslandService : AccessibilityService() {
         // Mudança de volume: broadcast do sistema, não é API pública, mas existe nos aparelhos comuns.
         private const val ACTION_VOLUME = "android.media.VOLUME_CHANGED_ACTION"
         private const val ACTION_BT_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
+        private const val ACTION_A2DP_STATE = "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"
+        private const val ACTION_HEADSET_STATE = "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED"
+        private const val EXTRA_PROFILE_STATE = "android.bluetooth.profile.extra.STATE"
         private const val EXTRA_BT_BATTERY = "android.bluetooth.device.extra.BATTERY_LEVEL"
     }
 }
