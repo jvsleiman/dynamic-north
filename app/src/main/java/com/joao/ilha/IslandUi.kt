@@ -289,7 +289,10 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     }
     val (tw, th) = sizeFor(mode)
     val tr = if (mode.large) s.largeRadius.dp else smallR
-    val springy = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
+    val openSpring = spring<Dp>(dampingRatio = s.motion.damping, stiffness = s.motion.stiffness)
+    // Ao fechar, a mola balança um pouco menos (sem a pílula ficar pequena e quicar de volta).
+    val closeSpring = spring<Dp>(dampingRatio = (s.motion.damping + 0.12f).coerceAtMost(0.95f), stiffness = s.motion.stiffness * 1.2f)
+    val springy = if (mode.large) openSpring else closeSpring
     // A mola passa um pouco do valor final; nada aqui pode ficar negativo (o Compose fecha o app).
     val wAnim by animateDpAsState(tw, springy, label = "w")
     val hAnim by animateDpAsState(th, springy, label = "h")
