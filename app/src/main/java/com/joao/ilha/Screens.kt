@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Timer
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.Air
 import androidx.compose.material.icons.rounded.Bedtime
@@ -93,7 +94,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class Screen {
-    Home, Display, Customize, Idle, Live, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
+    Home, Display, Customize, Idle, Live, Controls, ControlsApps, Notifications, Calls, Music, Charging, Bluetooth, Border, Gestures, HiddenApps, Other,
     BlockedNotifApps, BlockedMusicApps, Update, Help,
 }
 
@@ -142,6 +143,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
             NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
         Group("Recursos") {
+            NavRow("Controles rápidos", null, Icons.Rounded.Tune, Color(0xFF0A84FF)) { go(Screen.Controls) }
             NavRow("Ao vivo na ilha", onOff(s.liveEnabled || s.navEnabled || s.alarmEnabled), Icons.Rounded.Timer, Color(0xFFFF9500)) { go(Screen.Live) }
             NavRow("Notificação", onOff(s.notifEnabled), Icons.Rounded.Notifications, Color(0xFFFF3B30)) { go(Screen.Notifications) }
             NavRow("Chamada", onOff(s.callEnabled), Icons.Rounded.Call, SwitchGreen) { go(Screen.Calls) }
@@ -679,6 +681,44 @@ private fun WidthGroup(s: Settings) {
     }
 }
 
+// ---------- controles rápidos ----------
+
+@Composable
+fun ControlsScreen(back: () -> Unit, go: (Screen) -> Unit) {
+    val s by Prefs.state.collectAsState()
+    val ctx = LocalContext.current
+    val nm = remember { ctx.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager }
+    var canWrite by remember { mutableStateOf(AndroidSettings.System.canWrite(ctx)) }
+    var dnd by remember { mutableStateOf(nm.isNotificationPolicyAccessGranted) }
+    val lifecycle = LocalLifecycleOwner.current
+    LaunchedEffect(Unit) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            canWrite = AndroidSettings.System.canWrite(ctx)
+            dnd = nm.isNotificationPolicyAccessGranted
+        }
+    }
+    Page("Controles rápidos", back) {
+        Group(footer = "Com a ilha parada no estilo Simples, tocar nela abre os controles: lanterna, Wi‑Fi, Bluetooth, Não perturbe, som, rotação, brilho, volume e seus atalhos. Também dá para pôr em Toque e segurar.") {
+            NavRow("Atalhos de apps", if (s.controlsApps.isEmpty()) "Nenhum" else "${s.controlsApps.size}", divider = false) { go(Screen.ControlsApps) }
+        }
+        Group("Permissões", footer = "Brilho e rotação precisam de \"Alterar configurações do sistema\". Não perturbe e o modo silencioso precisam do acesso ao Não perturbe.") {
+            NavRow("Alterar configurações do sistema", onOff(canWrite)) {
+                runCatching { ctx.startActivity(Intent(AndroidSettings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}"))) }
+            }
+            NavRow("Acesso ao Não perturbe", onOff(dnd), divider = false) {
+                runCatching { ctx.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
+            }
+        }
+        Group("Volume") {
+            SwitchRow("Mostrar o volume na ilha", s.volumePopup, subtitle = "Barra na ilha ao usar os botões de volume", divider = false) { v -> s.set { copy(volumePopup = v) } }
+        }
+        Group("Jogos e Não perturbe", footer = "Os jogos são reconhecidos pela categoria que o próprio app informa ao Android.") {
+            SwitchRow("Modo de jogo", s.gameMode, subtitle = "Em jogos, a ilha some e só chamadas aparecem") { v -> s.set { copy(gameMode = v) } }
+            SwitchRow("Respeitar o Não perturbe", s.respectDnd, subtitle = "Sem avisos de notificação com o Não perturbe ligado", divider = false) { v -> s.set { copy(respectDnd = v) } }
+        }
+    }
+}
+
 // ---------- ao vivo ----------
 
 @Composable
@@ -692,6 +732,9 @@ fun LiveScreen(back: () -> Unit) {
             SwitchRow("Timer e cronômetro", s.liveEnabled, subtitle = "O tempo conta ao vivo na ilha") { v -> s.set { copy(liveEnabled = v) } }
             SwitchRow("Alarme tocando", s.alarmEnabled, subtitle = "Ilha grande com soneca e parar") { v -> s.set { copy(alarmEnabled = v) } }
             SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = false) { v -> s.set { copy(navEnabled = v) } }
+        }
+        Group(footer = "O Ilha não grava nada: só mostra o tempo enquanto o gravador do celular estiver gravando.") {
+            SwitchRow("Gravação de tela e de voz", s.recorderEnabled, divider = false) { v -> s.set { copy(recorderEnabled = v) } }
         }
         Group(footer = "Um pontinho verde aparece quando algum app usa a câmera e laranja quando usa o microfone.") {
             SwitchRow("Indicador de câmera e microfone", s.privacyDot, divider = false) { v -> s.set { copy(privacyDot = v) } }

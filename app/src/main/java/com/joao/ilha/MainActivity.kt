@@ -32,6 +32,11 @@ class MainActivity : ComponentActivity() {
                     Screen.Music -> MusicScreen(back, go)
                     Screen.Charging -> ChargingScreen(back)
                     Screen.Live -> LiveScreen(back)
+                    Screen.Controls -> ControlsScreen(back, go)
+                    Screen.ControlsApps -> AppPickerScreen(
+                        "Atalhos de apps", "Aparecem nos controles rápidos da ilha (até 6).",
+                        s.controlsApps, back,
+                    ) { v -> Prefs.update { it.copy(controlsApps = v.take(6).toSet()) } }
                     Screen.Bluetooth -> BluetoothScreen(back)
                     Screen.Border -> BorderScreen(back)
                     Screen.Gestures -> GesturesScreen(back)

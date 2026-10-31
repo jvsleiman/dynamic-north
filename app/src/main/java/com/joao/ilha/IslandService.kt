@@ -41,7 +41,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
-enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe, Live }
+enum class ExpandKind { Activity, Battery, Clock, Notifications, System, Health, Breathe, Live, Controls }
 
 class IslandUiState {
     val popup = MutableStateFlow<Popup?>(null)
@@ -86,6 +86,7 @@ class IslandService : AccessibilityService() {
                     show(Popup.Charging(ChargingInfo(batteryLevel(), i.action == Intent.ACTION_POWER_CONNECTED)))
                 }
                 Intent.ACTION_BATTERY_CHANGED -> batteryAlert(i)
+                ACTION_VOLUME -> volumeChanged(i)
                 Intent.ACTION_SCREEN_OFF -> {
                     locked.value = true
                     Health.screenOff()
@@ -131,6 +132,7 @@ class IslandService : AccessibilityService() {
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_BATTERY_CHANGED)
+            addAction(ACTION_VOLUME)
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
             addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction(ACTION_BT_BATTERY)
@@ -334,7 +336,8 @@ class IslandService : AccessibilityService() {
         val visible = s.enabled &&
             !(landscape && !s.showInLandscape) &&
             !(locked.value && s.hideOnLockscreen && !hasCall) &&
-            (foregroundPkg.value !in s.hiddenApps || hasCall)
+            (foregroundPkg.value !in s.hiddenApps || hasCall) &&
+            (!inGame() || hasCall)
         val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
         v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
         val t = touch ?: return
@@ -390,6 +393,8 @@ class IslandService : AccessibilityService() {
         if (view == null) return
         if (IslandBus.call.value?.incoming == true && p !is Popup.Test) return
         if (p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
+        if (p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
+        if (p !is Popup.Test && inGame()) return
         if (ui.expanded.value && p !is Popup.Test) return
         ui.asleep.value = false
         ui.popup.value = p
@@ -399,12 +404,52 @@ class IslandService : AccessibilityService() {
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
+        val duration = if (p is Popup.Volume) 1_600L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
-            delay(s.popupSeconds * 1000L + extra)
+            delay(duration)
             ui.popup.value = null
             scheduleSleep()
         }
     }
+
+    // ---------- Não perturbe e modo de jogo ----------
+
+    private fun dndActive(): Boolean =
+        (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager).currentInterruptionFilter > android.app.NotificationManager.INTERRUPTION_FILTER_ALL
+
+    private val gameCache = HashMap<String, Boolean>()
+
+    private fun isGame(pkg: String): Boolean = gameCache.getOrPut(pkg) {
+        runCatching {
+            val ai = packageManager.getApplicationInfo(pkg, 0)
+            @Suppress("DEPRECATION")
+            ai.category == android.content.pm.ApplicationInfo.CATEGORY_GAME || ai.flags and android.content.pm.ApplicationInfo.FLAG_IS_GAME != 0
+        }.getOrDefault(false)
+    }
+
+    /** Jogo aberto com o modo de jogo ligado: a ilha some e só chamadas aparecem. */
+    private fun inGame() = Prefs.state.value.gameMode && foregroundPkg.value.isNotEmpty() && isGame(foregroundPkg.value)
+
+    // ---------- aviso de volume ----------
+
+    private var lastVolumeAt = 0L
+
+    private fun volumeChanged(i: Intent) {
+        if (!Prefs.state.value.volumePopup || ui.expanded.value) return
+        val stream = i.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
+        if (stream != AudioManager.STREAM_MUSIC && stream != AudioManager.STREAM_RING) return
+        // Só depois do serviço iniciar (o sistema manda alguns ao ligar).
+        if (System.currentTimeMillis() - startedAt < 3000) return
+        val am = getSystemService(AUDIO_SERVICE) as AudioManager
+        val p = Popup.Volume(am.getStreamVolume(stream), am.getStreamMaxVolume(stream), stream == AudioManager.STREAM_RING)
+        val current = ui.popup.value
+        if (current != null && current !is Popup.Volume) return
+        val again = current is Popup.Volume
+        lastVolumeAt = System.currentTimeMillis()
+        show(p, haptic = !again)
+    }
+
+    private var startedAt = System.currentTimeMillis()
 
     // ---------- bateria fraca / cheia ----------
 
@@ -513,8 +558,8 @@ class IslandService : AccessibilityService() {
         }
     }
 
-    private fun canExpand() = IslandBus.call.value != null || IslandBus.media.value != null || IslandBus.live.value != null ||
-        IslandBus.notifications.value.isNotEmpty() || isCharging() || Prefs.state.value.idleStyle != IdleStyle.Simple
+    // Sempre dá para abrir: sem nada acontecendo, abre os controles rápidos.
+    private fun canExpand() = true
 
     /** Abre o layout que corresponde ao que a ilha está mostrando agora. */
     private fun kindForNow(): ExpandKind {
@@ -527,7 +572,7 @@ class IslandService : AccessibilityService() {
             IdleStyle.AppIcons, IdleStyle.Count -> ExpandKind.Notifications
             IdleStyle.Health, IdleStyle.Steps, IdleStyle.Water, IdleStyle.ScreenBreak, IdleStyle.Bedtime -> ExpandKind.Health
             IdleStyle.Breathing -> ExpandKind.Breathe
-            IdleStyle.Simple, IdleStyle.Pulse -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Battery else ExpandKind.Notifications
+            IdleStyle.Simple, IdleStyle.Pulse -> if (IslandBus.notifications.value.isEmpty()) ExpandKind.Controls else ExpandKind.Notifications
         }
     }
 
@@ -576,6 +621,13 @@ class IslandService : AccessibilityService() {
                     ?: IslandBus.media.value?.pkg
                     ?: IslandBus.notifications.value.firstOrNull()?.pkg
                 openPkg(pkg)
+            }
+            Gesture.Controls -> if (ui.expanded.value) collapse() else {
+                ui.expandKind.value = ExpandKind.Controls
+                popupJob?.cancel()
+                ui.popup.value = null
+                ui.expanded.value = true
+                if (!tap) vibrate()
             }
             Gesture.Nothing -> {}
         }
@@ -677,6 +729,8 @@ class IslandService : AccessibilityService() {
             WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
 
         // Bateria de fones: broadcast do sistema que existe na maioria dos aparelhos, mas não é API pública.
+        // Mudança de volume: broadcast do sistema, não é API pública, mas existe nos aparelhos comuns.
+        private const val ACTION_VOLUME = "android.media.VOLUME_CHANGED_ACTION"
         private const val ACTION_BT_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
         private const val EXTRA_BT_BATTERY = "android.bluetooth.device.extra.BATTERY_LEVEL"
     }

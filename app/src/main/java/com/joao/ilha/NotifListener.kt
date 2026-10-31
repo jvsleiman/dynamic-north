@@ -114,8 +114,12 @@ class NotifListener : NotificationListenerService() {
             // Lembrete de "próximo alarme" não tem tela cheia e não é contínuo.
             return if (s.alarmEnabled && n.fullScreenIntent != null) LiveKind.Alarm else null
         }
-        if (!s.liveEnabled || !sbn.isOngoing) return null
+        if (!sbn.isOngoing) return null
         val ex = n.extras
+        // Gravador de tela/voz: o Ilha não grava nada, só mostra o tempo da gravação do outro app.
+        val text = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
+        if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
+        if (!s.liveEnabled) return null
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val words = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)} ${n.channelIdSafe()}".lowercase()
         val isStopwatch = listOf("cronômetro", "cronometro", "stopwatch").any { it in words }
@@ -144,7 +148,11 @@ class NotifListener : NotificationListenerService() {
             title = title,
             text = text,
             icon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
-            chronoBase = if (chrono) n.`when` else 0L,
+            chronoBase = when {
+                chrono -> n.`when`
+                kind == LiveKind.Recording -> sbn.postTime
+                else -> 0L
+            },
             countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
             contentIntent = n.contentIntent,
             actions = n.actions.orEmpty().mapNotNull { a ->
@@ -265,6 +273,8 @@ class NotifListener : NotificationListenerService() {
         )
     }
 }
+
+private val recorderWords = listOf("gravando", "gravação de tela", "gravacao de tela", "recording", "screen record")
 
 private val navApps = setOf("com.google.android.apps.maps", "com.waze", "com.here.app.maps", "com.sygic.aura", "ru.yandex.yandexnavi")
 

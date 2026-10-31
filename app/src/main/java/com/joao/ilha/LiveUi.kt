@@ -48,6 +48,7 @@ internal val TimerColor = Color(0xFFFF9F0A)
 internal val NavColor = Color(0xFF0A84FF)
 internal val CamColor = Color(0xFF34C759)
 internal val MicColor = Color(0xFFFF9F0A)
+internal val RecColor = Color(0xFFFF3B30)
 
 private val timeLike = Regex("\\d{1,2}:\\d{2}(:\\d{2})?")
 
@@ -55,9 +56,14 @@ private fun LiveInfo.vector(): ImageVector = when (kind) {
     LiveKind.Timer, LiveKind.Stopwatch -> Icons.Rounded.Timer
     LiveKind.Alarm -> Icons.Rounded.Alarm
     LiveKind.Navigation -> Icons.Rounded.Navigation
+    LiveKind.Recording -> RecordIcon
 }
 
-private fun LiveInfo.tint(): Color = if (kind == LiveKind.Navigation) NavColor else TimerColor
+private fun LiveInfo.tint(): Color = when (kind) {
+    LiveKind.Navigation -> NavColor
+    LiveKind.Recording -> RecColor
+    else -> TimerColor
+}
 
 /** Tempo que aparece na ilha: conta sozinho quando o app manda a base do cronômetro. */
 @Composable
@@ -105,7 +111,7 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
         LiveIcon(l, (h - 14.dp) * ic)
         val right = if (l.kind == LiveKind.Navigation) l.title else liveTime(l)
         Text(
-            right, color = if (l.kind == LiveKind.Navigation) col.text else TimerColor,
+            right, color = if (l.kind == LiveKind.Navigation) col.text else l.tint(),
             fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
     }
@@ -130,17 +136,21 @@ internal fun ExpandedLive(l: LiveInfo) {
             } else {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(l.vector(), null, tint = TimerColor, modifier = Modifier.size(16.dp))
+                        Icon(l.vector(), null, tint = l.tint(), modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            if (l.kind == LiveKind.Timer) "Timer" else "Cronômetro",
-                            color = TimerColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            when (l.kind) {
+                                LiveKind.Timer -> "Timer"
+                                LiveKind.Recording -> "Gravando"
+                                else -> "Cronômetro"
+                            },
+                            color = l.tint(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                         )
                     }
                     val sub = listOf(l.title, l.text).firstOrNull { it.isNotBlank() && !timeLike.matches(it.trim()) }
                     if (sub != null) Text(sub, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(liveTime(l), color = TimerColor, fontSize = 42.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                Text(liveTime(l), color = l.tint(), fontSize = 42.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
         }
         LiveActions(l)

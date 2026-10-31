@@ -135,6 +135,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
+    Volume(false), ExpandedControls(true),
 }
 
 @Composable
@@ -172,6 +173,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         expanded && kind == ExpandKind.Activity && main == Act.Live -> Mode.ExpandedLive
         expanded && kind == ExpandKind.Activity && main == Act.Media -> Mode.ExpandedMedia
         expanded && call != null && kind == ExpandKind.Activity -> Mode.ExpandedCall
+        expanded && kind == ExpandKind.Controls -> Mode.ExpandedControls
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
         expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
@@ -185,6 +187,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Bluetooth -> Mode.Bluetooth
         popup is Popup.Test -> Mode.Test
         popup is Popup.Reminder -> Mode.Reminder
+        popup is Popup.Volume -> Mode.Volume
         main == Act.Call -> Mode.Call
         main == Act.Live -> Mode.Live
         main == Act.Media -> Mode.Media
@@ -237,6 +240,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedClock -> wide to 132.dp * k * t
         Mode.ExpandedSystem -> wide to 150.dp * k * t
         Mode.Reminder -> wide to 78.dp * k * t
+        Mode.Volume -> baseW + grow + 90.dp to baseH
+        Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + (if (live?.kind == LiveKind.Navigation) 64.dp else 28.dp) to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
         Mode.ExpandedLive -> wide to (if (live?.actions.isNullOrEmpty()) 92.dp else 132.dp) * k * t
@@ -353,6 +358,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.ExpandedHealth -> HealthCard(s)
                         Mode.ExpandedBreathe -> BreatheCard()
                         Mode.Live -> live?.let { CompactLive(it, baseH) }
+                        Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
+                        Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }
                         Mode.ExpandedLive -> live?.let { ExpandedLive(it) }
                     }

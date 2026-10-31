@@ -52,7 +52,7 @@ data class CallInfo(
     val contentIntent: PendingIntent?,
 )
 
-enum class LiveKind { Timer, Stopwatch, Alarm, Navigation }
+enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording }
 
 /** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
 data class LiveInfo(
@@ -84,6 +84,7 @@ sealed interface Popup {
     data class Bluetooth(val info: BluetoothInfo) : Popup
     data object Test : Popup
     data class Reminder(val kind: ReminderKind) : Popup
+    data class Volume(val level: Int, val max: Int, val ring: Boolean) : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */

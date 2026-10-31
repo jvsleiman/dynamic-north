@@ -11,6 +11,7 @@ import kotlinx.serialization.json.Json
 enum class Gesture(val label: String) {
     Expand("Expandir a ilha"),
     OpenApp("Abrir o app da atividade"),
+    Controls("Abrir os controles rápidos"),
     Nothing("Nada"),
 }
 
@@ -117,6 +118,13 @@ data class Settings(
     val reactiveBars: Boolean = true,
     val swipeChangesTrack: Boolean = true,
     val volumeInPlayer: Boolean = true,
+
+    // Controles rápidos, volume, jogo
+    val controlsApps: Set<String> = emptySet(),
+    val volumePopup: Boolean = true,
+    val gameMode: Boolean = true,
+    val respectDnd: Boolean = true,
+    val recorderEnabled: Boolean = true,
 
     // Ao vivo
     val liveEnabled: Boolean = true,
