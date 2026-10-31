@@ -8,7 +8,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,6 +20,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val s by Prefs.state.collectAsState()
             IlhaTheme(s.appTheme) {
+                val first = remember { Splash.shouldShow(this@MainActivity).also { if (it) Splash.markSeen(this@MainActivity) } }
+                var splash by remember { mutableStateOf(first) }
+                val replay by Splash.replay.collectAsState()
+                if (splash || replay) {
+                    SplashScreen { splash = false; Splash.replay.value = false }
+                    return@IlhaTheme
+                }
                 val stack = remember { mutableStateListOf(Screen.Home) }
                 val go: (Screen) -> Unit = { stack.add(it) }
                 val back: () -> Unit = { if (stack.size > 1) stack.removeAt(stack.lastIndex) }
