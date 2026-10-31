@@ -471,11 +471,14 @@ class IslandService : AccessibilityService() {
 
     fun show(p: Popup, haptic: Boolean = true) {
         if (view == null) return
-        if (IslandBus.call.value?.incoming == true && p !is Popup.Test) return
-        if (p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
-        if (p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
-        if (p !is Popup.Test && inGame()) return
-        if (ui.expanded.value && p !is Popup.Test) return
+        // Avisos da tela Testar sempre aparecem (mesmo com Não perturbe ou com a ilha aberta).
+        val test = p is Popup.Test || p is Popup.Intro || (p is Popup.Notification && p.item.key.startsWith("demo-"))
+        if (IslandBus.call.value?.incoming == true && !test) return
+        if (!test && p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
+        if (!test && p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
+        if (!test && inGame()) return
+        if (ui.expanded.value && !test) return
+        if (test) ui.expanded.value = false
         ui.asleep.value = false
         ui.thread.value = false
         ui.popup.value = p

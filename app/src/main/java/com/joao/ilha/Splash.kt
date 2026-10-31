@@ -151,16 +151,19 @@ private fun DrawScope.drawScene(t: Float, bg: Color) {
         dot(x, ground, Hill, 0.55f)
         if (((x + near).toInt() % 7) == 0) dot(x, ground + 2, Hill, 0.35f)
     }
-    var tx = -(near % 23f).toInt()
-    var k = (near / 23f).toInt()
-    while (tx < cols + 6) {
-        val hgt = 4 + (k * 7 % 4)
+    // Cada pinheiro tem lugar fixo no "mundo" e só desliza para a esquerda: nada pula nem volta.
+    val cell = 9
+    val first = kotlin.math.floor((near - 6f) / cell).toInt()
+    val last = ((near + cols + 6f) / cell).toInt()
+    for (c in first..last) {
+        val h = ((c * 2654435761L) ushr 7).toInt() and 0xffff
+        if (h % 5 == 0) continue // alguns espaços vazios
+        val tx = (c * cell + (h shr 4) % 4 - near).roundToInt()
+        val hgt = 3 + (h shr 8) % 5
         for (lvl in 0 until hgt) {
             val half = (hgt - lvl) / 2
             for (dx in -half..half) dot(tx + dx, ground - 1 - lvl, Pine)
         }
-        tx += 15 + (k * 5 % 11)
-        k++
     }
 
     // Cavalo: entra pela esquerda, galopa no meio e sai pela direita no fim.

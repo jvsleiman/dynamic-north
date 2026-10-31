@@ -261,7 +261,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedSystem -> wide to 150.dp * k * t
         Mode.Reminder -> wide to 78.dp * k * t
         Mode.Volume -> baseW + grow + 90.dp to baseH
-        Mode.Status -> baseW + grow + 96.dp to baseH
+        // Desbloqueio fica do tamanho normal da ilha; os outros avisos têm texto e crescem.
+        Mode.Status -> if ((popup as? Popup.Status)?.kind == StatusKind.Unlocked) sizeFor(Mode.Idle) else (baseW + grow + 96.dp to baseH)
         Mode.Done -> wide to 70.dp * k * t
         Mode.Intro -> wide to 132.dp * k
         Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t

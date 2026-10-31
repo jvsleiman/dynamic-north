@@ -308,6 +308,10 @@ internal fun StatusPopup(kind: StatusKind, h: Dp) {
         StatusKind.DndOff -> Triple(Icons.Rounded.DoNotDisturbOff, "Não perturbe desligado", col.dim)
         StatusKind.Unlocked -> Triple(Icons.Rounded.LockOpen, "", col.text)
     }
+    if (kind == StatusKind.Unlocked) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(icon, null, tint = tint, modifier = Modifier.size(h * 0.46f)) }
+        return
+    }
     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         if (kind == StatusKind.Silent) {
             // Silencioso: sininho branco numa pílula vermelha.
