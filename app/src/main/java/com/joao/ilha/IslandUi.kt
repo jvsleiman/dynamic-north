@@ -130,6 +130,9 @@ private val ListHeader = 46.dp
 private val ListRow = 56.dp
 private val Red = Color(0xFFFF3B30)
 
+/** Quanto o dedo precisa andar para a esquerda para tirar a música da ilha. */
+private val HideMediaDrag = 150.dp
+
 /** Cores da ilha (fundo e texto), escolhidas nos ajustes ou tiradas da capa/ícone. */
 internal data class IslandColors(val bg: Color, val text: Color, val dim: Color)
 
@@ -322,6 +325,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
 
     // Arrastar para o lado: a notificação acompanha o dedo e fecha ao soltar longe ou rápido.
     val swipeable = mode == Mode.Notification || mode == Mode.SmallNotif
+    // Música/vídeo: arraste longo para a esquerda tira da ilha (com resistência, para não fechar sem querer).
+    val mediaMode = mode == Mode.Media || mode == Mode.ExpandedMedia
     val drag = remember { Animatable(0f) }
     val dragScope = rememberCoroutineScope()
     // Ilha mudou de modo (fechou ou chegou outra coisa): volta para o lugar na hora, sem deslizar de volta.
@@ -352,7 +357,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         detectTapGestures(onTap = { actions.onTap() }, onLongPress = { actions.onHold() })
                     }
                     // Fica por fora do deslocamento, para o arraste não brigar com o próprio movimento.
-                    .pointerInput(swipeable) {
+                    .pointerInput(swipeable, mediaMode) {
                         val tracker = VelocityTracker()
                         var dx = 0f
                         detectHorizontalDragGestures(
@@ -362,8 +367,14 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                                 val far = abs(dx) > (if (swipeable) 48.dp else 60.dp).toPx()
                                 val fling = abs(v) > 900f && (dx == 0f || sign(v) == sign(dx))
                                 val dir = if (dx != 0f) dx else v
+                                val hide = mediaMode && dx < -HideMediaDrag.toPx()
                                 dragScope.launch {
-                                    if (!(far || fling)) drag.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 600f))
+                                    if (hide) {
+                                        drag.animateTo(-size.width * 2.6f, tween(180))
+                                        actions.onHideMedia()
+                                        delay(700)
+                                        drag.snapTo(0f)
+                                    } else if (!(far || fling)) drag.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 600f))
                                     else if (swipeable) {
                                         // Sai pela lateral e só então fecha.
                                         drag.animateTo(sign(dir) * size.width * 1.2f, tween(150))
@@ -388,8 +399,14 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                     .graphicsLayer {
                         // Notificação segue o dedo e vai sumindo; o resto só cede um pouco.
                         val x = drag.value
-                        translationX = if (swipeable) x else x * 0.25f
+                        translationX = when {
+                            swipeable -> x
+                            mediaMode && x < 0 -> x * 0.4f
+                            else -> x * 0.25f
+                        }
                         if (swipeable) alpha = (1f - abs(x) / (size.width * 0.9f)).coerceIn(0f, 1f)
+                        // Perto do ponto de fechar, a música vai apagando para avisar.
+                        if (mediaMode && x < 0) alpha = (1f - ((-x - HideMediaDrag.toPx() * 0.5f) / HideMediaDrag.toPx()).coerceIn(0f, 0.6f))
                     },
             ) {
                 AnimatedContent(

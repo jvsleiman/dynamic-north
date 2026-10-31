@@ -130,6 +130,9 @@ object IslandBus {
     /** Relê notificações e player depois de mudar um ajuste (apps bloqueados etc.). */
     @Volatile var refresh: (() -> Unit)? = null
 
+    /** Música/vídeo tirado da ilha com o arraste longo ("app|título"); volta se mudar de faixa ou voltar a tocar. */
+    @Volatile var hiddenMedia: String? = null
+
     /** Abre a ilha grande num layout (usado pela tela Testar). */
     @Volatile var expand: ((ExpandKind) -> Unit)? = null
 

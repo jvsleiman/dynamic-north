@@ -317,6 +317,7 @@ class IslandService : AccessibilityService() {
                         onCollapse = ::collapse,
                         onBubble = ::bubbleTapped,
                         onThread = ::openThread,
+                        onHideMedia = ::hideMedia,
                     ),
                 )
             }
@@ -780,6 +781,16 @@ class IslandService : AccessibilityService() {
         ui.thread.value = true
     }
 
+    private fun hideMedia() {
+        val m = IslandBus.media.value ?: return
+        IslandBus.hiddenMedia = "${m.pkg}|${m.title}"
+        // Pausa antes de sumir, para não ficar tocando sem aparecer.
+        if (m.playing) runCatching { m.controller.transportControls.pause() }
+        IslandBus.media.value = null
+        if (ui.expanded.value) ui.expanded.value = false
+        ui.focus.value = null
+    }
+
     private fun closeThread() {
         ui.thread.value = false
         if (ui.popup.value is Popup.Notification) {
@@ -848,4 +859,6 @@ class IslandActions(
     val onCollapse: () -> Unit,
     /** Setinha da notificação: true abre a conversa, false fecha. */
     val onThread: (Boolean) -> Unit,
+    /** Arraste longo para a esquerda na música: tira da ilha. */
+    val onHideMedia: () -> Unit,
 )

@@ -324,6 +324,8 @@ class NotifListener : NotificationListenerService() {
         publishMedia()
     }
 
+    private var lastMediaPlaying = false
+
     private fun publishMedia() {
         val c = controller
         val md = c?.metadata
@@ -338,6 +340,17 @@ class NotifListener : NotificationListenerService() {
         if (title.isNullOrBlank() || (s.musicOnlyWhilePlaying && !playing)) {
             IslandBus.media.value = null
             return
+        }
+        val key = "${c.packageName}|$title"
+        val wasPlaying = lastMediaPlaying
+        lastMediaPlaying = playing
+        if (IslandBus.hiddenMedia != null) {
+            // Tirada da ilha: só volta se for outra faixa ou se a pessoa der play de novo.
+            if (IslandBus.hiddenMedia == key && !(playing && !wasPlaying)) {
+                IslandBus.media.value = null
+                return
+            }
+            IslandBus.hiddenMedia = null
         }
         IslandBus.media.value = MediaInfo(
             pkg = c.packageName,
