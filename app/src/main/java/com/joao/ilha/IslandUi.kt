@@ -262,13 +262,15 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
             else -> 28.dp
         } to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
-        Mode.ExpandedLive -> wide to when {
-            live?.kind == LiveKind.Progress -> 78.dp
-            live?.kind == LiveKind.Trip -> if (live.actions.isEmpty()) 128.dp else 168.dp
-            live?.actions.isNullOrEmpty() -> 92.dp
-            // Botões redondos ficam ao lado do tempo, na mesma linha.
-            live!!.kind != LiveKind.Navigation && live.actions.all { actionIcon(it.title) != null } -> if (live.kind == LiveKind.Recording) 112.dp else 94.dp
-            else -> 132.dp
+        Mode.ExpandedLive -> wide to live.let { l ->
+            when {
+                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
+                l.kind == LiveKind.Progress -> 78.dp
+                l.kind == LiveKind.Trip -> if (l.actions.isEmpty()) 128.dp else 168.dp
+                // Botões redondos ficam ao lado do tempo, na mesma linha.
+                l.kind != LiveKind.Navigation && l.actions.all { actionIcon(it.title) != null } -> if (l.kind == LiveKind.Recording) 112.dp else 94.dp
+                else -> 132.dp
+            }
         } * k * t
         Mode.ExpandedHealth -> wide to 158.dp * k * t
         Mode.ExpandedBreathe -> wide to 168.dp * k
