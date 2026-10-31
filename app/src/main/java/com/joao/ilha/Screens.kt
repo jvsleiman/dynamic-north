@@ -613,7 +613,7 @@ fun a11yShortcutOn(ctx: Context): Boolean {
 /** Abre a tela da acessibilidade do próprio Ilha, onde fica o interruptor do atalho. */
 fun openA11yDetails(ctx: Context) {
     if (Build.VERSION.SDK_INT >= 31) {
-        val i = Intent(AndroidSettings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+        val i = Intent("android.settings.ACCESSIBILITY_DETAILS_SETTINGS")
             .putExtra(Intent.EXTRA_COMPONENT_NAME, ComponentName(ctx, IslandService::class.java).flattenToString())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (runCatching { ctx.startActivity(i) }.isSuccess) return

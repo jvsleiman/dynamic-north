@@ -323,12 +323,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                     .pointerInput(Unit) {
                         detectTapGestures(onTap = { actions.onTap() }, onLongPress = { actions.onHold() })
                     }
-                    .graphicsLayer {
-                        // Notificação segue o dedo e vai sumindo; o resto só cede um pouco.
-                        val x = drag.value
-                        translationX = if (swipeable) x else x * 0.25f
-                        if (swipeable) alpha = (1f - abs(x) / (size.width * 0.9f)).coerceIn(0f, 1f)
-                    }
+                    // Fica por fora do deslocamento, para o arraste não brigar com o próprio movimento.
                     .pointerInput(swipeable) {
                         val tracker = VelocityTracker()
                         var dx = 0f
@@ -361,8 +356,12 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                                 dragScope.launch { drag.snapTo(dx) }
                             },
                         )
-                    },
-                        )
+                    }
+                    .graphicsLayer {
+                        // Notificação segue o dedo e vai sumindo; o resto só cede um pouco.
+                        val x = drag.value
+                        translationX = if (swipeable) x else x * 0.25f
+                        if (swipeable) alpha = (1f - abs(x) / (size.width * 0.9f)).coerceIn(0f, 1f)
                     },
             ) {
                 AnimatedContent(
