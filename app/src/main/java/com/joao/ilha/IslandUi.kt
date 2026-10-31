@@ -147,7 +147,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
-    Volume(false), ExpandedControls(true), Status(false), Done(true), ExpandedHome(true),
+    Volume(false), ExpandedControls(true), Status(false), Done(true), ExpandedHome(true), Intro(true),
 }
 
 @Composable
@@ -206,6 +206,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Volume -> Mode.Volume
         popup is Popup.Status -> Mode.Status
         popup is Popup.Done -> Mode.Done
+        popup is Popup.Intro -> Mode.Intro
         main == Act.Call -> Mode.Call
         main == Act.Live -> Mode.Live
         main == Act.Media -> Mode.Media
@@ -262,6 +263,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Volume -> baseW + grow + 90.dp to baseH
         Mode.Status -> baseW + grow + 96.dp to baseH
         Mode.Done -> wide to 70.dp * k * t
+        Mode.Intro -> wide to 132.dp * k
         Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
@@ -450,6 +452,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
                         Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
                         Mode.Done -> (popup as? Popup.Done)?.let { DoneBanner(it) }
+                        Mode.Intro -> IntroScene()
                         Mode.ExpandedHome -> HomeCard(s, notifs.size, actions)
                         Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }

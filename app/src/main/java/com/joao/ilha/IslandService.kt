@@ -38,6 +38,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Estado da ilha que a interface desenha. */
@@ -179,6 +180,15 @@ class IslandService : AccessibilityService() {
         watchPrivacy()
         if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
+        // Depois de cada atualização, a ilha abre uma vez com a animação (com a tela ligada e desbloqueada).
+        if (Splash.shouldShow(this)) scope.launch {
+            delay(1_500)
+            IslandBus.awaitScreenOn()
+            locked.first { !it }
+            delay(400)
+            Splash.markSeen(this@IslandService)
+            show(Popup.Intro, haptic = false)
+        }
         scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
         scope.launch { combine(IslandBus.call, IslandBus.live, IslandBus.media) { _, _, _ -> }.collect { applyVisibility() } }
@@ -469,13 +479,13 @@ class IslandService : AccessibilityService() {
         ui.asleep.value = false
         ui.thread.value = false
         ui.popup.value = p
-        if (haptic) vibrate()
+        if (haptic && p !is Popup.Intro) vibrate()
         popupJob?.cancel()
         val s = Prefs.state.value
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
-        val duration = if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
+        val duration = if (p is Popup.Intro) INTRO_MS else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
             delay(duration)
             ui.popup.value = null

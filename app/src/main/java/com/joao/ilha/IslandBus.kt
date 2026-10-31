@@ -108,6 +108,8 @@ sealed interface Popup {
     data class Status(val kind: StatusKind) : Popup
     /** Algo terminou (download concluído). */
     data class Done(val title: String, val app: String, val icon: Icon?, val color: Int) : Popup
+    /** Animação da ilha depois de cada atualização do app. */
+    data object Intro : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */
