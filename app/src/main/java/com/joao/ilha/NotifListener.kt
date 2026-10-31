@@ -68,6 +68,7 @@ class NotifListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         lastShown.remove(sbn.key)
+        firstSeen.remove(sbn.key)
         refresh()
     }
 
@@ -133,6 +134,19 @@ class NotifListener : NotificationListenerService() {
         }
     }
 
+    /** Primeira vez que cada notificação apareceu (a hora de postagem muda a cada atualização). */
+    private val firstSeen = HashMap<String, Long>()
+
+    /** "01:23" ou "1:02:03" → milissegundos. */
+    private fun parseElapsed(s: String): Long? {
+        val m = Regex("(?<!\\d)(\\d{1,2}):(\\d{2})(?::(\\d{2}))?(?!\\d)").find(s) ?: return null
+        val a = m.groupValues[1].toLong()
+        val b = m.groupValues[2].toLong()
+        val c = m.groupValues[3].toLongOrNull()
+        val secs = if (c != null) a * 3600 + b * 60 + c else a * 60 + b
+        return secs * 1000
+    }
+
     private fun Notification.channelIdSafe(): String = if (Build.VERSION.SDK_INT >= 26) channelId.orEmpty() else ""
 
     private fun toLive(sbn: StatusBarNotification, kind: LiveKind): LiveInfo {
@@ -150,7 +164,11 @@ class NotifListener : NotificationListenerService() {
             icon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
             chronoBase = when {
                 chrono -> n.`when`
-                kind == LiveKind.Recording -> sbn.postTime
+                // Sem cronômetro do sistema: sincroniza pelo tempo escrito na notificação
+                // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
+                kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
+                    parseElapsed("$title $text")?.let { System.currentTimeMillis() - it }
+                        ?: if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
                 else -> 0L
             },
             countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),

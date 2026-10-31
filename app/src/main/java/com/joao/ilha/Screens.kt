@@ -755,7 +755,7 @@ fun LiveScreen(back: () -> Unit) {
 fun IdleScreen(back: () -> Unit) {
     val s by Prefs.state.collectAsState()
     val p = LocalPalette.current
-    val styles = IdleStyle.entries
+    val styles = IdleStyle.entries.filterNot { it.hidden }
     val pager = rememberPagerState(initialPage = styles.indexOf(s.idleStyle).coerceAtLeast(0)) { styles.size }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
