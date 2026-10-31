@@ -444,7 +444,8 @@ private fun IdleContent(style: IdleStyle, notifs: List<NotifItem>, h: Dp, privac
             now = System.currentTimeMillis()
             battery = batteryNow(ctx)
             if (style == IdleStyle.NetSpeed) netSpeed = NetMeter.sample()
-            delay(if (style == IdleStyle.NetSpeed) 1_000 else 15_000)
+            // Acorda na virada do minuto (a hora troca junto com a do sistema).
+            delay(if (style == IdleStyle.NetSpeed) 1_000 else 60_000 - System.currentTimeMillis() % 60_000 + 20)
         }
     }
     val apps = remember(notifs) { notifs.distinctBy { it.pkg } }
@@ -924,7 +925,8 @@ private fun Timer(startedAt: Long, color: Color, size: Int) {
     LaunchedEffect(startedAt) {
         while (true) {
             now = System.currentTimeMillis()
-            delay(1000)
+            // Troca o número logo depois da virada de cada segundo da chamada.
+            delay(1000 - Math.floorMod(now - startedAt, 1000L) + 5)
         }
     }
     Text(fmt(now - startedAt), color = color, fontSize = size.sp, fontWeight = FontWeight.SemiBold)

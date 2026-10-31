@@ -69,6 +69,7 @@ class NotifListener : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         lastShown.remove(sbn.key)
         firstSeen.remove(sbn.key)
+        textBase.remove(sbn.key)
         refresh()
     }
 
@@ -136,6 +137,7 @@ class NotifListener : NotificationListenerService() {
 
     /** Primeira vez que cada notificação apareceu (a hora de postagem muda a cada atualização). */
     private val firstSeen = HashMap<String, Long>()
+    private val textBase = HashMap<String, Long>()
 
     /** "01:23" ou "1:02:03" → milissegundos. */
     private fun parseElapsed(s: String): Long? {
@@ -167,8 +169,13 @@ class NotifListener : NotificationListenerService() {
                 // Sem cronômetro do sistema: sincroniza pelo tempo escrito na notificação
                 // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
                 kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
-                    parseElapsed("$title $text")?.let { System.currentTimeMillis() - it }
-                        ?: if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
+                    // Cada atualização chega igual ou atrasada, nunca adiantada: o menor valor é o início real.
+                    parseElapsed("$title $text")?.let { elapsed ->
+                        val guess = sbn.postTime - elapsed
+                        val best = minOf(textBase[sbn.key] ?: guess, guess)
+                        textBase[sbn.key] = best
+                        best
+                    } ?: if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
                 else -> 0L
             },
             countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
