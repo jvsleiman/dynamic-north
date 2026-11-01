@@ -128,7 +128,7 @@ internal fun WalletPayBanner(p: WalletPay) {
                     drawRoundRect(Color(0xFFE2C46A), Offset(9 * u, 18 * u), Size(15 * u, 11 * u), CornerRadius(2.5f * u))
                     for (i in 0..2) drawArc(
                         Color.White.copy(alpha = 0.8f), -40f, 80f, false,
-                        topLeft = Offset(size.width - (22 - i * 4) * u - (6 + i * 4) * u, (23.5f - (3 + i * 3)) * u),
+                        topLeft = Offset(size.width - (28 - i * 4) * u - (6 + i * 4) * u, (23.5f - (3 + i * 3)) * u),
                         size = Size((6 + i * 4) * 2 * u, (3 + i * 3) * 2 * u),
                         style = Stroke(1.4f * u, cap = StrokeCap.Round),
                     )
