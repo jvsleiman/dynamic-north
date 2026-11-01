@@ -64,7 +64,7 @@ data class CallInfo(
     val video: Boolean = false,
 )
 
-enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip, Workout }
+enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip, Workout, Delivery }
 
 /** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
 data class LiveInfo(
@@ -84,6 +84,9 @@ data class LiveInfo(
     val appName: String = "",
     val smallIcon: Icon? = null,
     val color: Int = 0,
+    /** Pedido de comida: etapa (OrderStep.ordinal) e previsão ("19:46 - 19:56"). */
+    val step: Int = 0,
+    val eta: String = "",
 )
 
 data class ChargingInfo(val level: Int, val charging: Boolean)

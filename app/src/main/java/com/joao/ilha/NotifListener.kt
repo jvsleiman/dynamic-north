@@ -54,7 +54,10 @@ class NotifListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        val isOrder = trackOrder(sbn)
         refresh()
+        // Status do pedido vira a atividade "Pedido" na ilha (não aparece de novo como notificação comum).
+        if (isOrder) return
         val s = Prefs.state.value
         if (!s.notifEnabled || sbn.packageName in s.blockedNotifApps) return
         if (!isRegular(sbn)) return
@@ -97,12 +100,19 @@ class NotifListener : NotificationListenerService() {
             .filter { isCall(it) }
             .maxByOrNull { it.postTime }
             ?.let { toCall(it) }
-        IslandBus.live.value = list
+        val best = list
             .mapNotNull { sbn -> liveKind(sbn)?.let { sbn to it } }
             // Alarme tocando tem prioridade; depois navegação; depois timers.
             .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress }, { it.first.key != lastProgress?.key }, { -it.first.postTime }))
             .firstOrNull()
             ?.let { (sbn, kind) -> toLive(sbn, kind) }
+        // Pedido de comida em andamento vem logo depois de alarme e navegação.
+        val ord = currentOrder()
+        IslandBus.live.value = when {
+            best != null && (best.kind == LiveKind.Alarm || best.kind == LiveKind.Navigation) -> best
+            ord != null -> ord
+            else -> best
+        }
         watchDone(IslandBus.live.value)
     }
 
@@ -132,6 +142,7 @@ class NotifListener : NotificationListenerService() {
         val text = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
         if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
         if (!s.liveEnabled) return null
+        if (pkg in deliveryApps) return null // pedidos: acompanhados à parte (Orders)
         if (pkg in tripApps) return LiveKind.Trip
         if (pkg in fitnessApps) return LiveKind.Workout
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
@@ -151,6 +162,47 @@ class NotifListener : NotificationListenerService() {
             else -> null
         }
     }
+
+    // ---------- pedido de comida (iFood e parecidos) ----------
+
+    private var order: LiveInfo? = null
+    private var orderAt = 0L
+
+    /** Lê o status do pedido de cada notificação do app de comida; true se era um status de pedido. */
+    private fun trackOrder(sbn: StatusBarNotification): Boolean {
+        if (sbn.packageName !in deliveryApps || !Prefs.state.value.liveEnabled) return false
+        val u = Orders.parse(sbn)
+        val prev = order?.takeIf { System.currentTimeMillis() - orderAt < 3 * 3600_000L }
+        val step = u.step ?: if (prev != null && u.eta.isNotBlank()) prev.orderStep() else return false
+        val n = sbn.notification
+        order = LiveInfo(
+            key = "pedido-${sbn.packageName}-${step.ordinal}", pkg = sbn.packageName, kind = LiveKind.Delivery,
+            title = u.place.ifBlank { prev?.title.orEmpty() }, text = u.text, icon = null, chronoBase = 0, countDown = false,
+            contentIntent = n.contentIntent ?: prev?.contentIntent, actions = emptyList(),
+            appName = appLabel(this, sbn.packageName), smallIcon = n.smallIcon, color = if (n.color != 0) n.color else prev?.color ?: 0,
+            step = step.ordinal, eta = u.eta.ifBlank { prev?.eta.orEmpty() },
+        )
+        orderAt = System.currentTimeMillis()
+        return true
+    }
+
+    /** Pedido ainda valendo: some 1 min depois de entregue/cancelado, ou 3 h depois do último status. */
+    private fun currentOrder(): LiveInfo? {
+        val o = order ?: return null
+        val age = System.currentTimeMillis() - orderAt
+        val st = o.orderStep()
+        val limit = if (st == OrderStep.Delivered || st == OrderStep.Cancelled) 60_000L else 3 * 3600_000L
+        if (age > limit) { order = null; return null }
+        if (age > limit - 60_000L || st == OrderStep.Delivered || st == OrderStep.Cancelled) {
+            // Confere de novo quando o prazo acabar, para a ilha tirar o pedido sozinha.
+            handler.removeCallbacks(expireOrder)
+            handler.postDelayed(expireOrder, limit - age + 500)
+        }
+        return o
+    }
+
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val expireOrder = Runnable { refresh() }
 
     private var lastProgress: LiveInfo? = null
     private var maxSeen = 0f

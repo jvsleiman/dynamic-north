@@ -25,6 +25,7 @@ class TestReceiver : BroadcastReceiver() {
             "gravacao" -> Demo.live(ctx, LiveKind.Recording)
             "download" -> Demo.download(ctx, MainScope())
             "corrida" -> Demo.trip(ctx)
+            "pedido" -> Demo.order(ctx)
             "treino" -> Demo.workout(ctx)
             "parar-live" -> Demo.stopLive()
             "camera" -> Demo.privacy(true)

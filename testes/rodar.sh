@@ -73,6 +73,10 @@ for c in bluetooth musica chamada chamada-ativa reuniao timer cronometro rota gr
   caso limpar; sleep 1
   caso $c; sleep 2; shot "$c"
 done
+log "== Pedido de comida (etapas) =="
+caso limpar; sleep 1
+for i in 1 2 3 4 5; do caso pedido; sleep 1.2; shot "pedido-aberto-$i"; sleep 3; shot "pedido-pequeno-$i"; done
+caso limpar; sleep 1
 caso musica; sleep 1; caso atividade; sleep 1.5; shot "musica-aberta"; fechar
 caso limpar; sleep 1
 caso principal; sleep 1.5; shot "ilha-principal"

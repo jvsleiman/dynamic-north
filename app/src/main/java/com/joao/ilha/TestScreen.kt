@@ -245,7 +245,7 @@ object Demo {
             LiveKind.Alarm -> LiveInfo("demo-live", ctx.packageName, kind, "Alarme", "07:00 · Acordar", null, 0, false, null, listOf(NotifAction("Soneca", openApp(ctx), null), NotifAction("Parar", openApp(ctx), null)))
             LiveKind.Navigation -> LiveInfo("demo-live", ctx.packageName, kind, "200 m", "Vire à direita na Av. Paulista", null, 0, false, null, listOf(NotifAction("Sair", openApp(ctx), null)))
             LiveKind.Recording -> LiveInfo("demo-live", ctx.packageName, kind, "Gravação 2", "", null, now, false, null, listOf(NotifAction("Parar", openApp(ctx), null), NotifAction("Pausar", openApp(ctx), null)))
-            LiveKind.Progress, LiveKind.Trip, LiveKind.Workout -> null
+            LiveKind.Progress, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery -> null
         }
     }
 
@@ -268,6 +268,22 @@ object Demo {
             "demo-trip", ctx.packageName, LiveKind.Trip, "Chega em 3 min", "Motorista ⭐ 4,9 · Carro prata · ABC1D23",
             avatar("M", 0xFF34C759.toInt()), 0, false, null, listOf(NotifAction("Ver no mapa", openApp(ctx), null)),
             appName = "Corrida", smallIcon = icon(ctx), color = 0xFF7B2FF7.toInt(),
+        )
+    }
+
+    private var orderStep = 0
+
+    /** Pedido de comida: cada toque avança uma etapa (aguardando → preparando → saiu → chegando → entregue). */
+    fun order(ctx: Context) {
+        val steps = listOf(OrderStep.Waiting, OrderStep.Preparing, OrderStep.OnTheWay, OrderStep.Arriving, OrderStep.Delivered)
+        val st = steps[orderStep % steps.size]
+        orderStep++
+        val f = java.text.SimpleDateFormat("HH:mm", java.util.Locale("pt", "BR"))
+        val now = System.currentTimeMillis()
+        IslandBus.live.value = LiveInfo(
+            "demo-pedido-${st.ordinal}", ctx.packageName, LiveKind.Delivery, "Restaurante Exemplo • Pedido Nº 1234", st.hint,
+            null, 0, false, openApp(ctx), emptyList(), appName = "Pedido", color = 0xFFEA1D2C.toInt(),
+            step = st.ordinal, eta = "${f.format(java.util.Date(now + 25 * 60_000))} - ${f.format(java.util.Date(now + 35 * 60_000))}",
         )
     }
 
@@ -357,6 +373,7 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Gravação de tela") { Demo.live(ctx, LiveKind.Recording) }
             NavRow("Download") { Demo.download(ctx, scope) }
             NavRow("Corrida") { Demo.trip(ctx) }
+            NavRow("Pedido de comida (toque de novo para avançar)") { Demo.order(ctx) }
             NavRow("Treino (Strava, Google Fit)") { Demo.workout(ctx) }
             NavRow("Navegação", icon = Icons.Rounded.Navigation, iconColor = Color(0xFF0A84FF)) { Demo.live(ctx, LiveKind.Navigation) }
             NavRow("Alarme tocando", icon = Icons.Rounded.Alarm, iconColor = Color(0xFFFF9500)) { Demo.live(ctx, LiveKind.Alarm) }

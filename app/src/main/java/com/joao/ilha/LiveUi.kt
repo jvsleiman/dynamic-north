@@ -87,13 +87,14 @@ private fun LiveInfo.vector(): ImageVector = when (kind) {
     LiveKind.Progress -> Icons.Rounded.Download
     LiveKind.Trip -> Icons.Rounded.DirectionsCar
     LiveKind.Workout -> Icons.AutoMirrored.Rounded.DirectionsRun
+    LiveKind.Delivery -> Icons.Rounded.DeliveryDining
 }
 
 private fun LiveInfo.tint(): Color = when (kind) {
     LiveKind.Navigation -> NavColor
     LiveKind.Recording -> RecColor
     LiveKind.Progress -> CamColor
-    LiveKind.Trip -> if (color != 0) Color(color).copy(alpha = 1f) else NavColor
+    LiveKind.Trip, LiveKind.Delivery -> if (color != 0) Color(color).copy(alpha = 1f) else NavColor
     LiveKind.Workout -> if (color != 0) Color(color).copy(alpha = 1f) else Color(0xFFFC4C02)
     else -> TimerColor
 }
@@ -154,6 +155,7 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
                 }
                 Icon(Icons.Rounded.Mic, null, tint = col.text, modifier = Modifier.size((h - 14.dp) * ic))
             }
+            LiveKind.Delivery -> CompactOrder(l, h)
             // Download: ícone do app e anel de progresso.
             LiveKind.Progress -> {
                 AppGlyph(l, (h - 12.dp) * ic)
@@ -232,6 +234,7 @@ internal fun ExpandedLive(l: LiveInfo) {
         LiveKind.Navigation -> ExpandedNav(l)
         LiveKind.Progress -> ExpandedProgress(l)
         LiveKind.Trip -> ExpandedTrip(l)
+        LiveKind.Delivery -> ExpandedOrder(l)
         LiveKind.Workout -> ExpandedWorkout(l)
         else -> ExpandedTimer(l)
     }
