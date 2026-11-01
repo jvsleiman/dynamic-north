@@ -188,6 +188,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         expanded && kind == ExpandKind.Activity && main == Act.Live -> Mode.ExpandedLive
         expanded && kind == ExpandKind.Activity && main == Act.Media -> Mode.ExpandedMedia
         expanded && call != null && kind == ExpandKind.Activity -> Mode.ExpandedCall
+        // Rota/timer/download que acabou de começar abre por um instante na própria atividade.
+        expanded && kind == ExpandKind.Live && live != null -> Mode.ExpandedLive
         expanded && kind == ExpandKind.Controls -> Mode.ExpandedControls
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
@@ -348,7 +350,12 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val islandDensity = remember(density.density, s.textScale) { Density(density.density, s.textScale / 100f) }
     CompositionLocalProvider(LocalIslandColors provides colors, LocalDensity provides islandDensity, LocalIconScale provides s.iconScale / 100f) {
         // A janela desenhada ocupa a largura toda; a ilha fica no centro (ou alinhada à câmera).
-        Box(Modifier.fillMaxWidth().offset { IntOffset(offsetX, 0) }, contentAlignment = Alignment.TopCenter) {
+        // Igual à área de toque: aberta, a ilha nunca sai da tela (câmera no canto).
+        val maxShift = ((with(density) { screenW.dp.roundToPx() } - targetW) / 2 - with(density) { 4.dp.roundToPx() }).coerceAtLeast(0)
+        val shownX by androidx.compose.animation.core.animateIntAsState(
+            offsetX.coerceIn(-maxShift, maxShift), androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 500f), label = "x",
+        )
+        Box(Modifier.fillMaxWidth().offset { IntOffset(shownX, 0) }, contentAlignment = Alignment.TopCenter) {
         Row(Modifier.padding(top = gap), verticalAlignment = Alignment.Top) {
             // Espaço igual do outro lado para a ilha principal continuar centralizada.
             if (hasSecond && s.dualOnRight) Spacer(Modifier.width(bubble + 6.dp))

@@ -410,12 +410,26 @@ class IslandService : AccessibilityService() {
         return (maxOf(m.heightPixels, m.widthPixels) * 0.6f).toInt()
     }
 
+    private var rawX = 0
+
+    /**
+     * Câmera no canto (furo à esquerda/direita): a ilha pequena fica sobre ela, mas aberta ela
+     * não pode sair da tela. Limita o deslocamento para caber inteira, com 4 dp de margem.
+     */
+    private fun clampX(x: Int, w: Int): Int {
+        val screenW = if (Build.VERSION.SDK_INT >= 30) wm.currentWindowMetrics.bounds.width() else resources.displayMetrics.widthPixels
+        val max = ((screenW - w) / 2 - (4 * resources.displayMetrics.density).toInt()).coerceAtLeast(0)
+        return x.coerceIn(-max, max)
+    }
+
     /** Tamanho da área de toque (a ilha e as bolinhas). Mudar não aparece na tela. */
     private fun setSize(wPx: Int, hPx: Int) {
         val p = touchParams ?: return
-        if (p.width != wPx || p.height != hPx) {
+        val x = clampX(rawX, wPx)
+        if (p.width != wPx || p.height != hPx || p.x != x) {
             p.width = wPx
             p.height = hPx
+            p.x = x
             touch?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
         }
     }
@@ -474,8 +488,9 @@ class IslandService : AccessibilityService() {
         p.y = y
         p.height = visualHeight()
         view?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, p) } }
+        rawX = x
         touchParams?.let { tp ->
-            tp.x = x
+            tp.x = clampX(x, tp.width)
             tp.y = y
             touch?.let { if (it.isAttachedToWindow) runCatching { wm.updateViewLayout(it, tp) } }
         }

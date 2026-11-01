@@ -63,7 +63,7 @@ sleep 3
 log "== Timer do relógio (pelo Android) =="
 adb shell am start -a android.intent.action.SET_TIMER --ei android.intent.extra.alarm.LENGTH 300 --ez android.intent.extra.alarm.SKIP_UI true >/dev/null 2>&1
 sleep 3; adb shell input keyevent 3; sleep 2; shot "timer-relogio"
-log "timer: $(adb shell dumpsys notification --noredact | grep -c -i 'timer')"
+adb shell dumpsys notification --noredact > $OUT/notificacoes.txt
 
 log "== Exemplos internos =="
 for c in bluetooth musica chamada chamada-ativa reuniao timer cronometro rota gravacao corrida treino download camera; do
