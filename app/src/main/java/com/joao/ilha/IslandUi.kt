@@ -278,9 +278,9 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
         Mode.ExpandedLive -> wide to live.let { l ->
             when {
+                l?.kind == LiveKind.Delivery -> if (l.title.isNotBlank()) 212.dp else 186.dp
                 l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
                 l.kind == LiveKind.Progress -> 78.dp
-                l.kind == LiveKind.Delivery -> if (l.title.isNotBlank()) 212.dp else 186.dp
                 l.kind == LiveKind.Trip -> if (l.actions.isEmpty()) 128.dp else 168.dp
                 l.kind == LiveKind.Workout -> if (l.actions.isEmpty()) 104.dp else 150.dp
                 // Botões redondos ficam ao lado do tempo, na mesma linha.

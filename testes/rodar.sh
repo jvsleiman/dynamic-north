@@ -99,3 +99,4 @@ adb shell run-as $PKG cat files/ultimo-erro.txt > $OUT/ultimo-erro.txt 2>/dev/nu
 adb logcat -d | grep -i -E "joao.ilha|AndroidRuntime" > $OUT/log-app.txt || true
 if grep -q "$PKG" $OUT/travamentos.txt; then log "TRAVOU: veja travamentos.txt"; else log "nenhum travamento"; fi
 # animação NOTCH: 926 quadros
+# pedido: altura da ilha aberta
