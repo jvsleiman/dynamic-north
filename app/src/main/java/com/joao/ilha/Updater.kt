@@ -54,9 +54,23 @@ object Updater {
                     done += n
                     if (total > 0) progress(done.toFloat() / total)
                 }
+                // Arquivo cortado no meio (conexão caiu): não tenta instalar um APK quebrado.
+                if (total > 0 && done != total) throw IllegalStateException("incompleto")
             }
         }
         out
+    }
+
+    fun canInstall(ctx: Context): Boolean = ctx.packageManager.canRequestPackageInstalls()
+
+    /** Abre a tela do Android "Instalar apps desconhecidos" já no Notch. */
+    fun askInstallPermission(ctx: Context) {
+        runCatching {
+            ctx.startActivity(
+                Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:" + ctx.packageName))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 
     fun install(ctx: Context, apk: File) {

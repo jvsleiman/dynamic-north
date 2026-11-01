@@ -91,7 +91,7 @@ class NotifListener : NotificationListenerService() {
     private fun refresh() {
         val list = runCatching { activeNotifications }.getOrNull() ?: return
         val blocked = Prefs.state.value.blockedNotifApps
-        IslandBus.notifications.value = list
+        IslandBus.notifications.value = if (!Prefs.state.value.notifEnabled) emptyList() else list
             .filter { isRegular(it) && it.packageName !in blocked }
             .sortedByDescending { it.postTime }
             .mapNotNull { cachedItem(it) }

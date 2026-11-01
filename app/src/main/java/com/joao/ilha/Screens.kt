@@ -398,7 +398,7 @@ private fun MissingPermissions(s: Settings) {
     }
     if (missing.isEmpty()) return
     Group("Falta permitir", footer = "Sem essas permissões, o Android não avisa o Notch e esses recursos não aparecem na ilha.") {
-        missing.forEach { (_, label) -> NavRow(label, "Permitir") { ask.launch(missing.map { it.first }.toTypedArray()) } }
+        missing.forEach { (perm, label) -> NavRow(label, "Permitir") { ask.launch(arrayOf(perm)) } }
         NavRow("Permitir tudo", divider = false) { ask.launch(missing.map { it.first }.toTypedArray()) }
     }
 }
@@ -435,7 +435,7 @@ fun GesturesScreen(back: () -> Unit) {
         Group("Pressionar e segurar") {
             ChoiceRows(Gesture.entries, s.holdGesture, { it.label }) { v -> s.set { copy(holdGesture = v) } }
         }
-        Group(footer = "Deslize a ilha para o lado para fechar um aviso ou recolher a ilha aberta.") {}
+        InfoText("Deslize a ilha para o lado para fechar um aviso ou recolher a ilha aberta.")
     }
 }
 
@@ -488,6 +488,7 @@ fun AppPickerScreen(title: String, footer: String, selected: Set<String>, back: 
         } else {
             val shown = list.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
                 .sortedWith(compareByDescending<AppEntry> { it.pkg in selected }.thenBy { it.label.lowercase() })
+            if (shown.isEmpty()) InfoText("Nenhum app encontrado para \"$query\".")
             Group(footer = footer) {
                 shown.forEachIndexed { i, a ->
                     val on = a.pkg in selected
@@ -571,10 +572,20 @@ fun UpdateScreen(back: () -> Unit) {
                             onClick = {
                                 scope.launch {
                                     runCatching {
+                                        if (!Updater.canInstall(ctx)) {
+                                            Updater.askInstallPermission(ctx)
+                                            status = UpdateStatus.Failed("Permita \"Instalar apps desconhecidos\" para o Notch e toque em Verificar de novo.")
+                                            return@runCatching
+                                        }
                                         val f = Updater.download(ctx, st.r) { pr -> status = UpdateStatus.Downloading(pr) }
                                         Updater.install(ctx, f)
                                         status = UpdateStatus.Available(st.r)
-                                    }.onFailure { status = UpdateStatus.Failed("O download falhou. Tente de novo.") }
+                                    }.onFailure { e ->
+                                        status = UpdateStatus.Failed(
+                                            if (e is java.io.IOException || e.message?.startsWith("HTTP") == true) "Sem conexão ou o servidor não respondeu. Tente de novo."
+                                            else "O download veio incompleto. Tente de novo.",
+                                        )
+                                    }
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Accent),

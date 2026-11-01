@@ -166,6 +166,7 @@ class IslandService : AccessibilityService() {
         Prefs.init(this)
         wm = getSystemService(WINDOW_SERVICE) as WindowManager
         IslandBus.serviceRunning.value = true
+        IslandBus.collapse = { collapse() }
         IslandBus.expand = { kind ->
             popupJob?.cancel()
             ui.popup.value = null
@@ -242,9 +243,10 @@ class IslandService : AccessibilityService() {
         // Clima e agenda da ilha principal: atualiza de tempos em tempos (o clima só a cada 30 min).
         scope.launch {
             while (true) {
-                if (!locked.value) {
-                    Weather.refresh(this@IslandService)
-                    Agenda.refresh(this@IslandService)
+                val st = Prefs.state.value
+                if (!locked.value && IslandBus.screenOn.value) {
+                    if (st.homeWeather || st.idleStyle == IdleStyle.Weather) Weather.refresh(this@IslandService)
+                    if (st.homeAgenda || st.idleStyle == IdleStyle.Agenda) Agenda.refresh(this@IslandService)
                 }
                 delay(5 * 60_000)
             }
@@ -407,7 +409,9 @@ class IslandService : AccessibilityService() {
     /** Altura fixa da janela desenhada: cabe a maior ilha aberta. */
     private fun visualHeight(): Int {
         val m = resources.displayMetrics
-        return (maxOf(m.heightPixels, m.widthPixels) * 0.6f).toInt()
+        // Só o necessário para a maior ilha aberta (ilha principal completa ~460 dp + descida), não 60% da tela.
+        val need = ((480 + Prefs.state.value.largeTopGap) * m.density * Prefs.state.value.textScale.coerceAtLeast(100) / 100f).toInt()
+        return minOf((maxOf(m.heightPixels, m.widthPixels) * 0.6f).toInt(), need)
     }
 
     private var rawX = 0
@@ -455,8 +459,10 @@ class IslandService : AccessibilityService() {
         val visible = s.enabled &&
             !(landscape && !s.showInLandscape && !hasCall) &&
             !(locked.value && s.hideOnLockscreen && !hasCall) &&
-            (foregroundPkg.value !in s.hiddenApps || hasActivity) &&
-            (!inGame() || hasActivity)
+            // App escondido e modo de jogo: só chamada aparece (escolha da pessoa). A janelinha PiP
+            // não conta como app aberto, então rota/música continuam aparecendo com vídeo em PiP.
+            (foregroundPkg.value !in s.hiddenApps || hasCall) &&
+            (!inGame() || hasCall)
         val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
         v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
         val t = touch ?: return

@@ -337,7 +337,7 @@ fun TestScreen(back: () -> Unit) {
                         4_000L to { Demo.workout(ctx) },
                         4_000L to { Demo.stopLive(); Demo.meeting(ctx) },
                         5_000L to { Demo.endCall(); Demo.weather(); IslandBus.expand?.invoke(ExpandKind.Home) },
-                        3_500L to { Demo.stopLive(); IslandBus.show(Popup.Charging(ChargingInfo(72, true))) },
+                        3_500L to { Demo.stopLive(); IslandBus.collapse?.invoke(); IslandBus.show(Popup.Charging(ChargingInfo(72, true))) },
                         3_500L to { IslandBus.show(Popup.Bluetooth(BluetoothInfo("Fones de ouvido", BtKind.Earbuds, true, 80))) },
                         3_500L to { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) },
                         2_500L to { IslandBus.show(Popup.Status(StatusKind.Silent)) },

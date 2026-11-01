@@ -84,6 +84,7 @@ object Health : SensorEventListener {
     }
 
     fun screenOn() {
+        rollDay() // virou o dia com a tela apagada: zera os passos sem esperar o sensor
         if (usingSince.value == 0L) usingSince.value = System.currentTimeMillis()
     }
 

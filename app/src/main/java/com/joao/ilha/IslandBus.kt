@@ -148,6 +148,7 @@ object IslandBus {
 
     /** Abre a ilha grande num layout (usado pela tela Testar). */
     @Volatile var expand: ((ExpandKind) -> Unit)? = null
+    @Volatile var collapse: (() -> Unit)? = null
 
     private val _popups = MutableSharedFlow<Popup>(extraBufferCapacity = 8)
     val popups = _popups.asSharedFlow()

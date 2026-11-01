@@ -78,6 +78,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -191,6 +192,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         // Rota/timer/download que acabou de começar abre por um instante na própria atividade.
         expanded && kind == ExpandKind.Live && live != null -> Mode.ExpandedLive
         expanded && kind == ExpandKind.Controls -> Mode.ExpandedControls
+        expanded && kind == ExpandKind.Notifications -> Mode.ExpandedList
         expanded && kind == ExpandKind.Battery -> Mode.ExpandedBattery
         expanded && kind == ExpandKind.Clock -> Mode.ExpandedClock
         expanded && kind == ExpandKind.System -> Mode.ExpandedSystem
@@ -1270,6 +1272,12 @@ private fun NotificationList(list: List<NotifItem>, actions: IslandActions) {
                 modifier = Modifier.pointerInput(Unit) { detectTapGestures { IslandBus.dismiss?.invoke(null); actions.onCollapse() } },
             )
         }
+        if (list.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("Nenhuma notificação", color = col.dim, fontSize = 13.sp)
+            }
+            return@Column
+        }
         LazyColumn(Modifier.fillMaxSize()) {
             items(list.take(50), key = { it.key }) { n -> SwipeRow(n, ic, actions) }
         }
@@ -1353,7 +1361,10 @@ private fun ClockCard() {
 private fun BatteryCard() {
     val col = LocalIslandColors.current
     val ctx = LocalContext.current
-    val i = remember { ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
+    // Relê a cada 2 s enquanto a ilha está aberta (carregador ligado/desligado aparece na hora).
+    val i by produceState(ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))) {
+        while (true) { delay(2_000); value = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }
+    }
     val level = i?.let { it.getIntExtra(BatteryManager.EXTRA_LEVEL, 0) * 100 / it.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1) } ?: 0
     val temp = (i?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0) / 10f
     val st = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
