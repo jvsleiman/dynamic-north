@@ -88,6 +88,10 @@ adb shell input tap $((W/2)) 40; sleep 1.5; shot "toque-na-ilha"; fechar
 log "== Aviso com a ilha aberta (deve aparecer depois de fechar) =="
 caso principal; sleep 1; caso bluetooth; sleep 1; fechar; sleep 1; shot "bluetooth-depois-de-fechar"
 
+log "== Animações de atualização =="
+fechar; caso limpar; sleep 2
+caso intro; sleep 2; shot "notch-chuva"; sleep 5; shot "notch-mar"; sleep 5; shot "notch-penhasco"; sleep 5; shot "notch-letreiro"; sleep 5
+caso cavalo; sleep 2; shot "cavalo"; sleep 3; shot "cavalo-titulo"; sleep 3
 log "== Travamentos =="
 log "serviço no fim: $(alive)"
 adb logcat -d -b crash > $OUT/travamentos.txt

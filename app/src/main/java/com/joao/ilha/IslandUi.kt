@@ -266,7 +266,8 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         // Desbloqueio fica do tamanho normal da ilha; os outros avisos têm texto e crescem.
         Mode.Status -> if ((popup as? Popup.Status)?.kind == StatusKind.Unlocked) sizeFor(Mode.Idle) else (baseW + grow + 96.dp to baseH)
         Mode.Done -> wide to 70.dp * k * t
-        Mode.Intro -> wide to 132.dp * k
+        // A animação NOTCH tem o formato do vídeo (240×136 pontos); a do cavalo é mais baixa.
+        Mode.Intro -> if ((popup as? Popup.Intro)?.horse == true) wide to 132.dp * k else wide to wide * (136f / 240f)
         Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
@@ -464,7 +465,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
                         Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
                         Mode.Done -> (popup as? Popup.Done)?.let { DoneBanner(it) }
-                        Mode.Intro -> IntroScene()
+                        Mode.Intro -> if ((popup as? Popup.Intro)?.horse == true) IntroScene() else NotchIntroScene()
                         Mode.ExpandedHome -> HomeCard(s, notifs.size, actions)
                         Mode.ExpandedControls -> ControlsCard(s, actions)
                         Mode.AlarmRinging -> live?.let { AlarmRinging(it) }

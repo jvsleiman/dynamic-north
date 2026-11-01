@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -255,5 +256,58 @@ private fun DrawScope.drawHorse(cx: Float, ground: Float, phase: Float, t: Float
     for (s in 0..2) for (j in 1..7) {
         val wave = sin(t * 12f - j * 0.75f + s) * 0.8f * j / 7f
         p(-7.6f - j * 0.95f, -1.6f + j * (0.25f + s * 0.12f) + wave)
+    }
+}
+
+// ---------- animação NOTCH (chuva, mar, penhasco e o letreiro) ----------
+
+/** Duração da animação NOTCH (o GIF tem 21 s). */
+const val NOTCH_INTRO_MS = 21_300L
+
+/** O GIF guarda um pontinho por pixel (240×136); a ilha desenha cada um como um quadradinho com vão. */
+private object NotchMovie {
+    private var movie: android.graphics.Movie? = null
+    @Suppress("DEPRECATION")
+    fun get(ctx: Context): android.graphics.Movie? = movie ?: runCatching {
+        ctx.resources.openRawResource(R.raw.intro).use { android.graphics.Movie.decodeStream(it.buffered()) }
+    }.getOrNull()?.also { movie = it }
+}
+
+@Suppress("DEPRECATION")
+@Composable
+fun NotchIntroScene() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val movie = remember { NotchMovie.get(ctx) }
+    val cols = movie?.width()?.takeIf { it > 0 } ?: 240
+    val rows = movie?.height()?.takeIf { it > 0 } ?: 136
+    val frame = remember { android.graphics.Bitmap.createBitmap(cols, rows, android.graphics.Bitmap.Config.ARGB_8888) }
+    val frameCanvas = remember { android.graphics.Canvas(frame) }
+    val paint = remember { android.graphics.Paint().apply { isFilterBitmap = false; isAntiAlias = false } }
+    var ms by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        val start = withFrameMillis { it }
+        val end = movie?.duration()?.takeIf { it > 0 } ?: 21_000
+        while (ms < end) withFrameMillis { ms = (it - start).toInt() }
+    }
+    Canvas(Modifier.fillMaxSize()) {
+        val m = movie ?: return@Canvas
+        m.setTime(ms.coerceAtMost(maxOf(m.duration() - 1, 0)))
+        frame.eraseColor(android.graphics.Color.BLACK)
+        m.draw(frameCanvas, 0f, 0f)
+        // Cobre a ilha toda mantendo os pontos quadrados.
+        val cell = maxOf(size.width / cols, size.height / rows)
+        val w = cell * cols; val h = cell * rows
+        val left = (size.width - w) / 2; val top = (size.height - h) / 2
+        drawContext.canvas.nativeCanvas.drawBitmap(frame, null, android.graphics.RectF(left, top, left + w, top + h), paint)
+        // Vão entre os pontos (como no vídeo: ponto de 2/3 da célula)
+        val gap = cell / 3f
+        for (i in 0..cols) {
+            val x = left + i * cell - gap / 2
+            drawRect(Color.Black, Offset(x, 0f), androidx.compose.ui.geometry.Size(gap, size.height))
+        }
+        for (j in 0..rows) {
+            val y = top + j * cell - gap / 2
+            drawRect(Color.Black, Offset(0f, y), androidx.compose.ui.geometry.Size(size.width, gap))
+        }
     }
 }

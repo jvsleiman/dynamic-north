@@ -391,7 +391,8 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Câmera em uso") { Demo.privacy(true) }
             NavRow("Microfone em uso") { Demo.privacy(false) }
             NavRow("Aviso de teste") { IslandBus.show(Popup.Test) }
-            NavRow("Animação de atualização", divider = false) { IslandBus.show(Popup.Intro) }
+            NavRow("Animação de atualização: NOTCH") { IslandBus.show(Popup.Intro()) }
+            NavRow("Animação de atualização: cavalo", divider = false) { IslandBus.show(Popup.Intro(horse = true)) }
         }
         Group("Ilha aberta", footer = "Abre a ilha grande direto no layout escolhido.") {
             NavRow("Ilha principal") { Demo.weather(); IslandBus.expand?.invoke(ExpandKind.Home) }

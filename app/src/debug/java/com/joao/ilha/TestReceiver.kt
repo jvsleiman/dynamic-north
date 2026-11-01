@@ -34,7 +34,8 @@ class TestReceiver : BroadcastReceiver() {
             "clima" -> { Demo.nextSky(); IslandBus.expand?.invoke(ExpandKind.Home) }
             "controles" -> IslandBus.expand?.invoke(ExpandKind.Controls)
             "atividade" -> IslandBus.expand?.invoke(ExpandKind.Activity)
-            "intro" -> IslandBus.show(Popup.Intro)
+            "intro" -> IslandBus.show(Popup.Intro())
+            "cavalo" -> IslandBus.show(Popup.Intro(horse = true))
             "teste" -> IslandBus.show(Popup.Test)
             "limpar" -> Demo.clearAll()
         }
