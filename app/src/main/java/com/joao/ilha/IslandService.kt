@@ -27,7 +27,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityWindowInfo
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import kotlinx.coroutines.CoroutineScope
@@ -261,52 +260,25 @@ class IslandService : AccessibilityService() {
         }
     }
 
+    // Sem ler o conteúdo das telas (muitos bancos bloqueiam apps que fazem isso): o app aberto
+    // vem só do evento de troca de janela. Janelinha PiP costuma não ser "tela cheia", então
+    // depois que o celular mostrar que marca isso, eventos que não são de tela cheia não contam.
+    private var seenFullScreen = false
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         val type = event?.eventType ?: return
-        if (!IslandBus.screenOn.value) return
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
-        // Com vídeo em janelinha (PiP), o app do vídeo continua mandando eventos mesmo estando em
-        // segundo plano. Por isso o app "aberto" vem da lista de janelas, ignorando a janela PiP.
-        val fromWindows = mainAppFromWindows()
-        if (fromWindows != null) {
-            foregroundPkg.value = fromWindows
-            return
-        }
         if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (Build.VERSION.SDK_INT >= 26 && windows.any { it.isInPictureInPictureMode && it.root?.packageName?.toString() == event.packageName?.toString() }) return
-        if (isSmallWindowApp(event.packageName?.toString())) return
         val pkg = event.packageName?.toString() ?: return
         if (ignoredPkg(pkg)) return
+        if (event.isFullScreen) seenFullScreen = true
+        else if (seenFullScreen && !Banks.isBank(pkg)) return
+        if (!IslandBus.screenOn.value && !Banks.isBank(pkg)) return
         foregroundPkg.value = pkg
     }
 
     // Painel de notificações e teclado não contam como "app aberto".
     private fun ignoredPkg(pkg: String) =
         pkg == "com.android.systemui" || pkg == packageName || pkg.contains("inputmethod") || pkg.contains("keyboard")
-
-    /** App em tela cheia de verdade: a janela de app ativa que não está em PiP. */
-    private fun mainAppFromWindows(): String? = runCatching {
-        val screen = resources.displayMetrics.let { it.widthPixels.toLong() * it.heightPixels }
-        val r = android.graphics.Rect()
-        val apps = windows.filter { w ->
-            w.getBoundsInScreen(r)
-            // Alguns celulares não marcam a janelinha como PiP: janela pequena também não conta.
-            w.type == AccessibilityWindowInfo.TYPE_APPLICATION && !(Build.VERSION.SDK_INT >= 26 && w.isInPictureInPictureMode) &&
-                r.width().toLong() * r.height() > screen * 0.4
-        }
-        val main = apps.firstOrNull { it.isActive || it.isFocused } ?: apps.firstOrNull()
-        val pkg = main?.root?.packageName?.toString()
-        pkg?.takeUnless { ignoredPkg(it) }
-    }.getOrNull()
-
-    /** O app só tem uma janela pequena na tela (janelinha de vídeo, mesmo sem a marca de PiP). */
-    private fun isSmallWindowApp(pkg: String?): Boolean = runCatching {
-        if (pkg == null) return false
-        val screen = resources.displayMetrics.let { it.widthPixels.toLong() * it.heightPixels }
-        val r = android.graphics.Rect()
-        val mine = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName?.toString() == pkg }
-        mine.isNotEmpty() && mine.all { w -> w.getBoundsInScreen(r); r.width().toLong() * r.height() <= screen * 0.4 }
-    }.getOrDefault(false)
 
     override fun onInterrupt() {}
 
@@ -463,12 +435,15 @@ class IslandService : AccessibilityService() {
             // não conta como app aberto, então rota/música continuam aparecendo com vídeo em PiP.
             (foregroundPkg.value !in s.hiddenApps || hasCall) &&
             (!inGame() || hasCall)
+        // App de banco aberto: a ilha some de vez, sem nada por cima dele.
+        val bank = Banks.isBank(foregroundPkg.value)
         val sleepingGone = ui.asleep.value && !s.keepMiniWhenHidden
-        v.visibility = if (visible) View.VISIBLE else View.INVISIBLE
+        v.visibility = if (bank) View.GONE else if (visible) View.VISIBLE else View.INVISIBLE
+        touch?.visibility = if (bank) View.GONE else View.VISIBLE
         val t = touch ?: return
         val tp = touchParams ?: return
         val base = BASE_FLAGS or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-        val flags = if (visible && !sleepingGone) base else base or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        val flags = if (visible && !sleepingGone && !bank) base else base or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         if (tp.flags != flags) {
             tp.flags = flags
             if (t.isAttachedToWindow) runCatching { wm.updateViewLayout(t, tp) }
@@ -523,9 +498,10 @@ class IslandService : AccessibilityService() {
         if (!test && p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
         if (!test && p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
         if (!test && inGame()) return
+        if (!test && Banks.isBank(foregroundPkg.value)) return
         if (ui.expanded.value && !test) {
             // Com a ilha aberta o aviso espera e aparece quando ela fechar (não se perde).
-            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done) pending = p to System.currentTimeMillis()
+            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet) pending = p to System.currentTimeMillis()
             return
         }
         if (test) ui.expanded.value = false
@@ -538,7 +514,7 @@ class IslandService : AccessibilityService() {
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
-        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
+        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Wallet) Wallet.SHOW_MS else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
             delay(duration)
             ui.popup.value = null

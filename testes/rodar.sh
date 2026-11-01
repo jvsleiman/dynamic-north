@@ -77,6 +77,7 @@ log "== Pedido de comida (etapas) =="
 caso limpar; sleep 1
 for i in 1 2 3 4 5; do caso pedido; sleep 1.2; shot "pedido-aberto-$i"; sleep 3; shot "pedido-pequeno-$i"; done
 caso limpar; sleep 1
+caso carteira; sleep 0.3; shot "carteira-1"; sleep 0.5; shot "carteira-2"; sleep 0.9; shot "carteira-3"; sleep 3; caso limpar; sleep 1
 caso musica; sleep 1; caso atividade; sleep 1.5; shot "musica-aberta"; fechar
 caso limpar; sleep 1
 caso principal; sleep 1.5; shot "ilha-principal"

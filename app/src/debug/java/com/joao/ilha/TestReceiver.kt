@@ -26,6 +26,7 @@ class TestReceiver : BroadcastReceiver() {
             "download" -> Demo.download(ctx, MainScope())
             "corrida" -> Demo.trip(ctx)
             "pedido" -> Demo.order(ctx)
+            "carteira" -> Demo.wallet()
             "treino" -> Demo.workout(ctx)
             "parar-live" -> Demo.stopLive()
             "camera" -> Demo.privacy(true)

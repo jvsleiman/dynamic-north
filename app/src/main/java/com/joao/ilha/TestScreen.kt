@@ -274,6 +274,8 @@ object Demo {
     private var orderStep = 0
 
     /** Pedido de comida: cada toque avança uma etapa (aguardando → preparando → saiu → chegando → entregue). */
+    fun wallet() = IslandBus.show(Popup.Wallet(WalletPay("R\$ 24,90", "Padaria Central", "4821", null, 0xFF1F4E8C.toInt())))
+
     fun order(ctx: Context) {
         val steps = listOf(OrderStep.Waiting, OrderStep.Preparing, OrderStep.OnTheWay, OrderStep.Arriving, OrderStep.Delivered)
         val st = steps[orderStep % steps.size]
@@ -374,6 +376,7 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Download") { Demo.download(ctx, scope) }
             NavRow("Corrida") { Demo.trip(ctx) }
             NavRow("Pedido de comida (toque de novo para avançar)") { Demo.order(ctx) }
+            NavRow("Pagamento com a Google Carteira") { Demo.wallet() }
             NavRow("Treino (Strava, Google Fit)") { Demo.workout(ctx) }
             NavRow("Navegação", icon = Icons.Rounded.Navigation, iconColor = Color(0xFF0A84FF)) { Demo.live(ctx, LiveKind.Navigation) }
             NavRow("Alarme tocando", icon = Icons.Rounded.Alarm, iconColor = Color(0xFFFF9500)) { Demo.live(ctx, LiveKind.Alarm) }

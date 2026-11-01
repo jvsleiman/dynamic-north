@@ -113,6 +113,7 @@ sealed interface Popup {
     data class Done(val title: String, val app: String, val icon: Icon?, val color: Int) : Popup
     /** Animação da ilha depois de cada atualização do app. */
     data class Intro(val horse: Boolean = false) : Popup
+    data class Wallet(val pay: WalletPay) : Popup
 }
 
 /** Liga o leitor de notificações, o serviço da ilha e as telas (tudo no mesmo processo). */
