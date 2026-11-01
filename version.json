@@ -1,0 +1,6 @@
+{
+  "versionCode": 34,
+  "versionName": "1.0.6",
+  "apk": "Ilha-1.0.6.apk",
+  "notes": "1.0.6: o Notch não lê mais o conteúdo das telas e some de vez com app de banco aberto (notificações de banco ignoradas); animação do cartão ao pagar com a Google Carteira, como no iPhone"
+}
