@@ -1,0 +1,152 @@
+11-01 18:50:08.628   483  1652 I ConditionProviders:  Allowing condition provider com.joao.ilha/com.joao.ilha.NotifListener (userSet: true)
+11-01 18:50:08.628   483  1652 I NotificationListeners:  Allowing notification listener com.joao.ilha/com.joao.ilha.NotifListener (userSet: true)
+11-01 18:50:08.629   483  1652 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:08.629   483  1652 V NotificationListeners: binding: Intent { act=android.service.notification.NotificationListenerService cmp=com.joao.ilha/.NotifListener (has extras) }
+11-01 18:50:09.101  2538  2538 I com.joao.ilha: Late-enabling -Xcheck:jni
+11-01 18:50:09.344  2538  2538 I com.joao.ilha: Using CollectorTypeCC GC.
+11-01 18:50:09.344  2538  2538 W com.joao.ilha: Unexpected CPU variant for x86: x86_64.
+11-01 18:50:09.344  2538  2538 W com.joao.ilha: Known variants: atom, sandybridge, silvermont, kabylake, default
+11-01 18:50:09.382   483   516 I ActivityManager: Start proc 2538:com.joao.ilha/u0a174 for service {com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:09.439   483   738 I SdkSandboxManager: No SDKs used. Skipping SDK data reconcilation for CallingInfo{mUid=10174, mPackageName='com.joao.ilha'}
+11-01 18:50:09.492   957   957 D MediaPlayerList: Name of package changed: com.joao.ilha
+11-01 18:50:09.507   957   957 D MediaPlayerList: Name of package changed: com.joao.ilha
+11-01 18:50:09.866   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{c636db0 com.google.android.as/10117} BLOCKED
+11-01 18:50:10.387  2538  2538 W ziparchive: Unable to open '/data/app/~~4_hf1acqV9QN_S8pHJyUdQ==/com.joao.ilha-cVd3k37Z0YIGCC2Z33ikfw==/base.dm': No such file or directory
+11-01 18:50:10.429  2538  2538 W ziparchive: Unable to open '/data/app/~~4_hf1acqV9QN_S8pHJyUdQ==/com.joao.ilha-cVd3k37Z0YIGCC2Z33ikfw==/base.dm': No such file or directory
+11-01 18:50:10.887   483   483 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:10.887   483   483 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-01 18:50:11.766  2538  2538 D nativeloader: Configuring classloader-namespace for other apk /data/app/~~4_hf1acqV9QN_S8pHJyUdQ==/com.joao.ilha-cVd3k37Z0YIGCC2Z33ikfw==/base.apk. target_sdk_version=35, uses_libraries=, library_path=/data/app/~~4_hf1acqV9QN_S8pHJyUdQ==/com.joao.ilha-cVd3k37Z0YIGCC2Z33ikfw==/lib/x86_64:/data/app/~~4_hf1acqV9QN_S8pHJyUdQ==/com.joao.ilha-cVd3k37Z0YIGCC2Z33ikfw==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.joao.ilha
+11-01 18:50:11.794  2538  2538 V GraphicsEnvironment: ANGLE Developer option for 'com.joao.ilha' set to: 'default'
+11-01 18:50:11.794  2538  2538 V GraphicsEnvironment: ANGLE GameManagerService for com.joao.ilha: false
+11-01 18:50:12.091   483   483 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:12.091   483   483 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-01 18:50:13.022   984   984 D CarrierSvcBindHelper: onPackageAdded: com.joao.ilha
+11-01 18:50:13.153   483   483 V NotificationListeners: 0 notification listener service connected: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:17.654   984   984 D ImsResolver: maybeAddedImsService, packageName: com.joao.ilha
+11-01 18:50:18.115  2538  3207 D ProfileInstaller: Installing profile for com.joao.ilha
+11-01 18:50:19.265  2538  2538 W com.joao.ilha: Verification of kotlin.coroutines.CoroutineContext kotlin.coroutines.CoroutineContext$plus$1.invoke(kotlin.coroutines.CoroutineContext, kotlin.coroutines.CoroutineContext$Element) took 205.536ms (433.01 bytecodes/s) (3192B approximate peak alloc)
+11-01 18:50:19.549  2538  2538 W com.joao.ilha: Verification of void androidx.compose.runtime.snapshots.StateRecord.<init>() took 158.803ms (88.16 bytecodes/s) (1552B approximate peak alloc)
+11-01 18:50:19.757   483  1603 D CoreBackPreview: Window{d9c9796 u0 com.joao.ilha}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@5327f04, mPriority=0}
+11-01 18:50:19.995   483   563 D CoreBackPreview: Window{7b8aa9c u0 com.joao.ilha}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@8c81246, mPriority=0}
+11-01 18:50:20.083   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{741241e com.google.android.as/10117} BLOCKED
+11-01 18:50:20.084   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{cf1b4ff com.google.android.partnersetup/10104} BLOCKED
+11-01 18:50:21.377  2538  2538 W com.joao.ilha: Verification of void kotlinx.coroutines.CancellableContinuationImpl.detachChildIfNonResuable() took 390.519ms (25.61 bytecodes/s) (1416B approximate peak alloc)
+11-01 18:50:22.212   483   483 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:50:22.212   483   483 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-01 18:50:23.356  2538  2538 W com.joao.ilha: Verification of void androidx.compose.ui.node.LookaheadCapablePlaceable.captureRulers(androidx.compose.ui.node.PlaceableResult) took 109.102ms (5297.77 bytecodes/s) (15752B approximate peak alloc)
+11-01 18:50:23.495  2538  2538 W com.joao.ilha: Verification of void androidx.compose.ui.node.NodeCoordinator.ancestorToLocal(androidx.compose.ui.node.NodeCoordinator, androidx.compose.ui.geometry.MutableRect, boolean) took 121.075ms (115.63 bytecodes/s) (1656B approximate peak alloc)
+11-01 18:50:23.754  2538  2538 W com.joao.ilha: Verification of java.lang.String androidx.compose.ui.text.caches.SimpleArrayMap.toString() took 151.739ms (533.81 bytecodes/s) (2928B approximate peak alloc)
+11-01 18:50:23.900  2538  2538 W com.joao.ilha: Verification of void androidx.compose.runtime.AbstractApplier.move(java.util.List, int, int, int) took 132.812ms (459.30 bytecodes/s) (2568B approximate peak alloc)
+11-01 18:50:23.976   483   853 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{741241e com.google.android.as/10117} BLOCKED
+11-01 18:50:24.176  2538  2538 W com.joao.ilha: Verification of void com.joao.ilha.IslandUiKt.NotificationBanner(com.joao.ilha.NotifItem, boolean, boolean, com.joao.ilha.IslandActions, androidx.compose.runtime.Composer, int) took 197.272ms (21503.25 bytecodes/s) (90488B approximate peak alloc)
+11-01 18:50:24.816  2538  2538 W com.joao.ilha: Verification of androidx.compose.foundation.layout.Arrangement$Horizontal androidx.compose.foundation.layout.Arrangement.aligned(androidx.compose.ui.Alignment$Horizontal) took 334.385ms (71.77 bytecodes/s) (1832B approximate peak alloc)
+11-01 18:50:25.117  2538  2538 W com.joao.ilha: Verification of androidx.compose.ui.Modifier androidx.compose.foundation.BackgroundKt.background(androidx.compose.ui.Modifier, androidx.compose.ui.graphics.Brush, androidx.compose.ui.graphics.Shape, float) took 287.605ms (152.99 bytecodes/s) (2384B approximate peak alloc)
+11-01 18:50:25.143  2538  2538 W com.joao.ilha: Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+11-01 18:50:25.143  2538  2538 W com.joao.ilha: Common causes for lock verification issues are non-optimized dex code
+11-01 18:50:25.143  2538  2538 W com.joao.ilha: and incorrect proguard optimizations.
+11-01 18:50:25.144  2538  2538 W com.joao.ilha: Method boolean androidx.compose.runtime.snapshots.SnapshotStateList.conditionalUpdate$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+11-01 18:50:25.144  2538  2538 W com.joao.ilha: Method java.lang.Object androidx.compose.runtime.snapshots.SnapshotStateList.mutate(kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+11-01 18:50:25.144  2538  2538 W com.joao.ilha: Method void androidx.compose.runtime.snapshots.SnapshotStateList.update(boolean, kotlin.jvm.functions.Function1) failed lock verification and will run slower.
+11-01 18:50:25.144  2538  2538 W com.joao.ilha: Method void androidx.compose.runtime.snapshots.SnapshotStateList.update$default(androidx.compose.runtime.snapshots.SnapshotStateList, boolean, kotlin.jvm.functions.Function1, int, java.lang.Object) failed lock verification and will run slower.
+11-01 18:50:26.741  2538  2538 W com.joao.ilha: Verification of void androidx.compose.ui.platform.ViewLayer.resetClipBounds() took 199.066ms (246.15 bytecodes/s) (2296B approximate peak alloc)
+11-01 18:50:30.368  2538  2600 I com.joao.ilha: NativeAlloc concurrent copying GC freed 28336(2140KB) AllocSpace objects, 5(228KB) LOS objects, 49% free, 3682KB/7365KB, paused 30us,25us total 584.186ms
+11-01 18:50:32.054  1058  3193 I FontLog : Package com.joao.ilha has no metadata [CONTEXT service_id=132 ]
+11-01 18:50:32.157  1302  2813 I BlockstoreStorage: Clearing Blockstore Data for package com.joao.ilha [CONTEXT service_id=258 ]
+11-01 18:50:34.198  2538  2599 I com.joao.ilha: Compiler allocated 4355KB to compile void android.view.ViewRootImpl.performTraversals()
+11-01 18:50:40.951   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{aeb5aad com.google.android.settings.intelligence/10107} BLOCKED
+11-01 18:50:40.951   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{aa481e2 com.android.remoteprovisioner/10149} BLOCKED
+11-01 18:50:50.214   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{9e02db0 com.android.remoteprovisioner/10149} BLOCKED
+11-01 18:51:06.127   483  1816 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{2aa840e com.google.android.settings.intelligence/10107} BLOCKED
+11-01 18:51:06.130   483  1816 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{7aaae2f com.google.android.settings.intelligence/10107} BLOCKED
+11-01 18:51:06.829  4937  4937 I HibernationPolicy: android.cameraextensions=Thu Jan 01 00:00:00 UTC 1970, com.google.android.apps.wallpaper.nexus=Thu Jan 01 00:00:00 UTC 1970, com.android.localtransport=Sun Nov 01 18:50:03 UTC 2026, com.joao.ilha=Sun Nov 01 18:51:02 UTC 2026, com.google.android.apps.nexuslauncher=Sun Nov 01 18:50:04 UTC 2026, com.google.android.nearby.halfsheet=Thu Jan 01 00:00:00 UTC 1970, com.android.carrierdefaultapp=Thu Jan 01 00:00:00 UTC 1970, com.android.theme.font.notoserifsource=Thu Jan 01 00:00:00 UTC 1970, com.android.proxyhandler=Thu Jan 01 00:00:00 UTC 1970, com.google.android.safetycenter.resources=Thu Jan 01 00:00:00 UTC 1970, com.android.internal.display.cutout.emulation.waterfall=Thu Jan 01 00:00:00 UTC 1970, com.android.intentresolver=Thu Jan 01 00:00:00 UTC 1970, com.google.android.connectivity.resources=Thu Jan 01 00:00:00 UTC 1970, com.android.providers.contacts.auto_generated_rro_product__=Thu Jan 01 00:00:00 UTC 1970, com.google.android.feedback=Thu Jan 01 00:00:00 UTC 1970, com.google.android.printservice.recommendation=Thu Jan 01 00:00:00 UTC 1970, com.google.android.calendar=Thu Jan 01 00:00:00 UTC 1970, com.android.managedprovisioning=Sun Nov 01 18:50:10 UTC 2026, com.android.soundpicker=Thu Jan 01 00:00:00 UTC 1970, com.google.android.documentsui=Sun Nov 01 18:50:35 UTC 2026, com.android.systemui.emulation.pixel_3a_xl=Thu Jan 01 00:00:00 UTC 1970, com.android.systemui.emulation.pixel_6_pro=Thu Jan 01 00:00:00 UTC 1970, com.android.systemui.emulation.pixel_7_pro=Thu Jan 01 00:00:00 UTC 1970, com.google.mainline.telemetry=Thu Jan 01 00:00:00 UTC 1970, com.google.android.systemui.gxoverlay=Thu Jan 01 00:00:00 UTC 1970, com.android.carrierconfig.auto_generated_rro_product__=Thu Jan 01 00:00:00 UTC 1970, com.android.emulator.multidisplay=Sun Nov 01 18:50:35 UTC 2026, com.android.providers.partnerbookmarks=Thu Jan 01 00:00:00 UTC 1970, com.android.wallpaper.livepicker=Thu Jan 01 00:00:00 UTC 1970, com.android.providers.telephony.auto_generated_rro_product__=Thu Jan 01 00:00:00 UTC 1970, com.android.phone.auto_generated_rro_vendor__=Thu Jan 01 00:00:00 UTC 1970, com.google.mainline.adservices=Thu Jan 01 00:00:00 UTC 1970, com.android.imsserviceentitlement=Thu Jan 01 00:00:00 UTC 1970, com.google.android.sdksetup=Sun Nov 01 18:50:06 UTC 2026, com.android.internal.emulation.pixel_2_xl=Thu Jan 01 00:00:00 UTC 1970, com.android.internal.emulation.pixel_3_xl=Thu Jan 01 00:00:00 UTC 1970, com.android.internal.emulation.pixel_4_xl=Thu Jan 01 00:00:00 UTC 1970, com.android.storagemanager=Thu Jan 01 00:00:00 UTC 1970, com.android.bookmarkprovider=Thu Jan 01 00:00:00 UTC 1970, com.google.android.overlay.pixelconfigcommon=Thu Jan 01 00:00:00 UTC 1970, com.android.settings=Sun Nov 01 18:50:35 UTC 2026, com.android.systemui.emulation.pixel_3a=Thu Jan 01 00:00:00 UTC 1970, com.android.systemui.emulation.pixel_4a=Thu Jan 01 00:00:00 UTC 1970, com.android.systemui.emulation.pixel_6a=Thu Jan 01 00:00:00 UTC 1970, com.google.android.settings.intelligence=Sun Nov 01 18:50:33 UTC 2026, com.google.android.uwb.resources=Thu Jan 01 00:00:00 UTC 1970, com.android.cts.ctsshim=Thu Jan 01 00:00:00 UTC 1970, com.google.android.wifi.resources=Thu Jan 01 00:00:00 UTC 1970, com.android.remoteprovisioner=Sun Nov 01 18:50:56 UTC 2026, com.google.android.wifi.dialog=Thu Jan 01 00:00:00 UTC 1970, com.android.vpndialogs=Thu Jan 01 00:00:00 UTC 1970, com.google.android.apps.wallpaper=Sun Nov 01 18:50:04 UTC 2026, com.google.android.odad=Thu Jan 01 00:00:00 UTC 1970, com.android.phone=Sun Nov 01 18:49:48 UTC 2026, com.android.shell=Thu Jan 01 00:00:00 UTC 1970, com.android.wallpaperbackup=Thu Jan 01 00:00:00 UTC 1970, com.android.providers.blockednumber=Thu Jan 01 00:00:00 UTC 1970, com.android.settings.auto_generated_rro_product__=Thu Jan 01 00:00:00 UTC 1970, com.android.providers.userdictionary=Thu Jan 01 00:00:00 UTC 1970, com.android.emergency=Thu Jan 01 00:00:00 UTC 1970, com.android.internal.systemui.navbar.gestural=Thu Jan 01 00:00:00 UTC 1970, com.android.location.fused=Sun Nov 01 18:
+11-01 18:51:06.995   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{5127f06 com.google.android.setupwizard/10116} BLOCKED
+11-01 18:51:09.518   483   538 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{d314736 com.google.android.as/10117} BLOCKED
+11-01 18:51:09.543   483   483 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:51:09.545   483   483 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-01 18:51:23.431  4492  4492 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:24.106  5421  5421 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:29.219  5492  5492 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:29.995  5523  5523 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:30.396  5562  5562 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:30.813  5591  5591 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:31.357  5616  5616 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:31.670  5638  5638 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:31.892  5656  5656 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:32.072  5675  5675 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:32.543  5699  5699 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:32.832  5721  5721 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:33.511  5741  5741 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:34.636  5771  5771 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:34.880  5790  5790 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:35.210  5808  5808 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:35.430  5834  5834 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:35.757  5852  5852 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:51:37.142   759   759 D AndroidRuntime: Shutting down VM
+11-01 18:51:37.156   759   759 E AndroidRuntime: FATAL EXCEPTION: main
+11-01 18:51:37.156   759   759 E AndroidRuntime: Process: com.android.systemui, PID: 759
+11-01 18:51:37.156   759   759 E AndroidRuntime: java.lang.IllegalArgumentException: Unknown authority com.google.android.flipendo.api
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.content.ContentResolver.call(ContentResolver.java:2447)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.google.android.systemui.power.PowerNotificationWarningsGoogleImpl$1.onReceive(PowerNotificationWarningsGoogleImpl.java:958)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.systemui.broadcast.ActionReceiver$onReceive$1$1$1.run(ActionReceiver.kt:21)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:942)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:201)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:288)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:7924)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:936)
+11-01 18:51:41.562   483  1814 I AppsFilter: interaction: PackageSetting{9927cf3 com.joao.ilha/10174} -> PackageSetting{3f476a com.google.android.apps.nexuslauncher/10153} BLOCKED
+11-01 18:51:51.358   483   538 I AppsFilter: interaction: PackageSetting{eee0413 com.joao.ilha/10174} -> PackageSetting{a47b650 com.google.android.as/10117} BLOCKED
+11-01 18:51:51.383   483   483 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-01 18:51:51.385   483   483 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-01 18:51:55.555   483   752 I AppsFilter: interaction: PackageSetting{eee0413 com.joao.ilha/10174} -> PackageSetting{82fa022 com.google.android.settings.intelligence/10107} BLOCKED
+11-01 18:52:03.469  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 91649(3243KB) AllocSpace objects, 0(0B) LOS objects, 45% free, 4027KB/7365KB, paused 229us,5us total 190.774ms
+11-01 18:52:07.459  6479  6479 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:07.643  6497  6497 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:07.802  6514  6514 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:15.042  2538  2599 I com.joao.ilha: Compiler allocated 4438KB to compile void com.joao.ilha.IslandUiKt.IdleContent-6a0pyJM(com.joao.ilha.IdleStyle, java.util.List, float, boolean, androidx.compose.runtime.Composer, int)
+11-01 18:52:17.470  6593  6593 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:17.689  6611  6611 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:17.741  6629  6629 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:17.823  6647  6647 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:34.037  2538  2600 W com.joao.ilha: Cleared Reference was only reachable from finalizer (only reported once)
+11-01 18:52:34.040  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 73698(3052KB) AllocSpace objects, 0(0B) LOS objects, 42% free, 4261KB/7365KB, paused 6.747ms,13us total 181.358ms
+11-01 18:52:46.005  2538  2599 I com.joao.ilha: Compiler allocated 4863KB to compile void com.joao.ilha.LiveUiKt.ExpandedTimer(com.joao.ilha.LiveInfo, androidx.compose.runtime.Composer, int)
+11-01 18:52:46.365  7223  7223 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:46.630  7255  7255 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:46.898  7273  7273 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:46.960  7291  7291 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:47.026  7308  7308 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:56.067   483  1621 I MediaSessionStack: addSession to bottom of stack | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:52:56.101   483  1815 I MediaSessionStack: onPlaybackStateChanged - Pushing session to top | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:52:56.111   957   957 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-01 18:52:56.130   957   957 I MediaPlayerList: Adding wrapped media player: com.joao.ilha at key: 2
+11-01 18:52:56.131   957   957 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-01 18:52:56.132   957   957 I MediaPlayerList: Adding wrapped media player: com.joao.ilha at key: 2
+11-01 18:52:57.195  7450  7450 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:57.368  7476  7476 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:52:57.462  7494  7494 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:02.356  7537  7537 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:05.534   483   853 I MediaSessionStack: removeSession | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:53:06.042  2538  2599 I com.joao.ilha: Compiler allocated 4160KB to compile void android.widget.TextView.<init>(android.content.Context, android.util.AttributeSet, int, int)
+11-01 18:53:06.204  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 70819(2804KB) AllocSpace objects, 0(0B) LOS objects, 38% free, 4512KB/7365KB, paused 58.765ms,8us total 265.682ms
+11-01 18:53:07.308  7580  7580 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:07.473  7624  7624 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:07.547  7642  7642 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:07.664  7660  7660 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-01 18:53:26.166  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 63549(2440KB) AllocSpace objects, 0(0B) LOS objects, 33% free, 4865KB/7365KB, paused 53us,12us total 231.881ms
+11-01 18:53:34.688  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 55886(2300KB) AllocSpace objects, 0(0B) LOS objects, 31% free, 5059KB/7365KB, paused 25.698ms,10us total 110.992ms
+11-01 18:53:46.675  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 47364(1953KB) AllocSpace objects, 0(0B) LOS objects, 27% free, 5363KB/7365KB, paused 26us,9us total 105.814ms
+11-01 18:53:51.617  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 43139(1777KB) AllocSpace objects, 0(0B) LOS objects, 24% free, 5537KB/7365KB, paused 43us,23us total 123.910ms
+11-01 18:54:44.563  2538  2600 I com.joao.ilha: Background concurrent copying GC freed 81417(3292KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 4042KB/8084KB, paused 24us,9us total 238.563ms
+11-01 18:55:01.339  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 94213(3748KB) AllocSpace objects, 0(0B) LOS objects, 45% free, 4389KB/8084KB, paused 5.995ms,18us total 179.925ms
+11-01 18:55:01.925   483   853 I MediaSessionStack: addSession to bottom of stack | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:55:01.978   483   853 I MediaSessionStack: onPlaybackStateChanged - Pushing session to top | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:55:01.978   957   957 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-01 18:55:01.978   957   957 D MediaPlayerList: Already have a controller for the player: com.joao.ilha, updating instead
+11-01 18:55:01.980   957   957 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-01 18:55:01.980   957   957 D MediaPlayerList: Already have a controller for the player: com.joao.ilha, updating instead
+11-01 18:55:06.757   483  1807 I MediaSessionStack: removeSession | record: com.joao.ilha/notch-teste (userId=0)
+11-01 18:56:17.192  2538  2600 I com.joao.ilha: Background young concurrent copying GC freed 44710(1826KB) AllocSpace objects, 0(0B) LOS objects, 27% free, 5885KB/8084KB, paused 16.710ms,7us total 180.795ms
+11-01 18:56:52.499  2538  2600 I com.joao.ilha: Background concurrent copying GC freed 122868(3882KB) AllocSpace objects, 1(24KB) LOS objects, 49% free, 4139KB/8278KB, paused 46us,9us total 274.013ms

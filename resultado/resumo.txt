@@ -1,0 +1,75 @@
+Performing Streamed Install
+Success
+tela 1080x2400
+print 01-animacao-atualizacao.png
+print 02-ilha-parada.png
+serviço: vivo
+== Notificações (pelo Android) ==
+print 03-notificacao-conversa.png
+print 04-notificacao-simples.png
+print 05-teste-whatsapp.png
+== Carregador e bateria (pelo Android) ==
+print 06-carregador-ligado.png
+print 07-carregador-desligado.png
+print 08-bateria-fraca.png
+== Volume, Não perturbe, desbloqueio (pelo Android) ==
+print 09-volume.png
+print 10-nao-perturbe-ligado.png
+print 11-nao-perturbe-desligado.png
+print 12-desbloqueio.png
+== Timer do relógio (pelo Android) ==
+print 13-timer-relogio.png
+== Exemplos internos ==
+print 14-bluetooth.png
+print 15-musica.png
+print 16-chamada.png
+print 17-chamada-ativa.png
+print 18-reuniao.png
+print 19-timer.png
+print 20-cronometro.png
+print 21-rota.png
+print 22-gravacao.png
+print 23-corrida.png
+print 24-treino.png
+print 25-download.png
+print 26-camera.png
+== Pedido de comida (etapas) ==
+print 27-pedido-aberto-1.png
+print 28-pedido-pequeno-1.png
+print 29-pedido-aberto-2.png
+print 30-pedido-pequeno-2.png
+print 31-pedido-aberto-3.png
+print 32-pedido-pequeno-3.png
+print 33-pedido-aberto-4.png
+print 34-pedido-pequeno-4.png
+print 35-pedido-aberto-5.png
+print 36-pedido-pequeno-5.png
+print 37-carteira-1.png
+print 38-carteira-2.png
+print 39-carteira-3.png
+print 40-carteira-4.png
+print 41-musica-aberta.png
+print 42-ilha-principal.png
+print 43-clima-1.png
+print 44-clima-2.png
+print 45-clima-3.png
+print 46-clima-4.png
+print 47-clima-5.png
+print 48-clima-6.png
+print 49-clima-7.png
+print 50-clima-8.png
+print 51-controles.png
+== Toque na ilha ==
+print 52-toque-na-ilha.png
+== Aviso com a ilha aberta (deve aparecer depois de fechar) ==
+print 53-bluetooth-depois-de-fechar.png
+== Animações de atualização ==
+print 54-notch-chuva.png
+print 55-notch-mar.png
+print 56-notch-penhasco.png
+print 57-notch-letreiro.png
+print 58-cavalo.png
+print 59-cavalo-titulo.png
+== Travamentos ==
+serviço no fim: vivo
+nenhum travamento

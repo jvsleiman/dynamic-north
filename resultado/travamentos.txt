@@ -1,0 +1,15 @@
+--------- beginning of crash
+11-01 18:51:37.156   759   759 E AndroidRuntime: FATAL EXCEPTION: main
+11-01 18:51:37.156   759   759 E AndroidRuntime: Process: com.android.systemui, PID: 759
+11-01 18:51:37.156   759   759 E AndroidRuntime: java.lang.IllegalArgumentException: Unknown authority com.google.android.flipendo.api
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.content.ContentResolver.call(ContentResolver.java:2447)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.google.android.systemui.power.PowerNotificationWarningsGoogleImpl$1.onReceive(PowerNotificationWarningsGoogleImpl.java:958)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.systemui.broadcast.ActionReceiver$onReceive$1$1$1.run(ActionReceiver.kt:21)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:942)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:201)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:288)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:7924)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+11-01 18:51:37.156   759   759 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:936)
