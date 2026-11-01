@@ -25,9 +25,11 @@ adb shell settings put secure accessibility_enabled 1
 SIZE=$(adb shell wm size | tail -1 | sed 's/.*: //'); W=${SIZE%x*}; H=${SIZE#*x}
 log "tela ${W}x${H}"
 adb shell input keyevent 224; adb shell wm dismiss-keyguard; adb shell input keyevent 3
-sleep 3
+# O emulador é lento na primeira abertura: espera a ilha aparecer e a animação de atualização passar.
+for i in $(seq 1 30); do adb shell dumpsys window windows | grep -q "com.joao.ilha" && break; sleep 1; done
+sleep 4
 shot "animacao-atualizacao"
-sleep 8
+sleep 12
 shot "ilha-parada"
 log "serviço: $(alive)"
 

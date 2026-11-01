@@ -119,6 +119,13 @@ class NotifListener : NotificationListenerService() {
             // Lembrete de "próximo alarme" não tem tela cheia e não é contínuo.
             return if (s.alarmEnabled && n.fullScreenIntent != null) LiveKind.Alarm else null
         }
+        // Relógio do Google: o timer não é "contínuo", não tem título e guarda a hora de terminar no "when"
+        // (achado na bateria de testes). Reconhece pelo canal e pela hora no futuro.
+        if (clockApp && s.liveEnabled && !sbn.isOngoing) {
+            val ch = n.channelIdSafe().lowercase()
+            if (("timer" in ch || "temporizador" in ch) && n.`when` > System.currentTimeMillis()) return LiveKind.Timer
+            if (("stopwatch" in ch || "cronômetro" in ch || "cronometro" in ch) && n.actions?.isNotEmpty() == true) return LiveKind.Stopwatch
+        }
         if (!sbn.isOngoing) return null
         val ex = n.extras
         // Gravador de tela/voz: o Notch não grava nada, só mostra o tempo da gravação do outro app.
@@ -192,11 +199,13 @@ class NotifListener : NotificationListenerService() {
             key = sbn.key,
             pkg = sbn.packageName,
             kind = kind,
-            title = title,
+            title = title.ifBlank { if (kind == LiveKind.Timer) "Timer" else if (kind == LiveKind.Stopwatch) "Cronômetro" else "" },
             text = text,
             icon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
             chronoBase = when {
                 chrono -> n.`when`
+                // Timer sem cronômetro do sistema, mas com a hora de terminar no "when" (Relógio do Google).
+                kind == LiveKind.Timer && n.`when` > System.currentTimeMillis() -> n.`when`
                 // Sem cronômetro do sistema: sincroniza pelo tempo escrito na notificação
                 // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
                 kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
@@ -217,7 +226,8 @@ class NotifListener : NotificationListenerService() {
                     } - Prefs.state.value.liveOffsetMs
                 else -> 0L
             },
-            countDown = Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
+            countDown = (Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)) ||
+                (kind == LiveKind.Timer && !chrono && n.`when` > System.currentTimeMillis()),
             progress = ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0).let { max -> if (max > 0) ex.getInt(Notification.EXTRA_PROGRESS, 0).toFloat() / max else -1f },
             appName = appLabel(this, sbn.packageName),
             smallIcon = n.smallIcon,
