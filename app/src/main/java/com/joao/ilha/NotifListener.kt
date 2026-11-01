@@ -123,7 +123,7 @@ class NotifListener : NotificationListenerService() {
         // (achado na bateria de testes). Reconhece pelo canal e pela hora no futuro.
         if (clockApp && s.liveEnabled && !sbn.isOngoing) {
             val ch = n.channelIdSafe().lowercase()
-            if (("timer" in ch || "temporizador" in ch) && n.`when` > System.currentTimeMillis()) return LiveKind.Timer
+            if (("timer" in ch || "temporizador" in ch) && n.actions?.isNotEmpty() == true) return LiveKind.Timer
             if (("stopwatch" in ch || "cronômetro" in ch || "cronometro" in ch) && n.actions?.isNotEmpty() == true) return LiveKind.Stopwatch
         }
         if (!sbn.isOngoing) return null
@@ -154,7 +154,7 @@ class NotifListener : NotificationListenerService() {
 
     private var lastProgress: LiveInfo? = null
     private var maxSeen = 0f
-    private val progressWords = listOf("baixando", "download", "instalando", "installing", "enviando", "upload", "atualizando", "updating", "verificando", "pendente", "pending")
+    private val progressWords = listOf("baixando", "download", "instalando", "installing", "enviando", "upload")
 
     /**
      * "Concluído" só quando o download que estava na ilha chega a 100% ou some depois de ter passado de 90%
@@ -187,6 +187,23 @@ class NotifListener : NotificationListenerService() {
         return secs * 1000
     }
 
+    /**
+     * Notificação com layout próprio: monta o layout (como um widget) e lê o cronômetro dele.
+     * Devolve a hora (relógio de parede) do cronômetro e se ele conta para baixo.
+     */
+    private fun chronoInLayout(n: Notification): Pair<Long, Boolean>? = runCatching {
+        val rv = n.contentView ?: n.bigContentView ?: return null
+        val root = rv.apply(this, android.widget.FrameLayout(this))
+        fun find(v: android.view.View): android.widget.Chronometer? = when (v) {
+            is android.widget.Chronometer -> v
+            is android.view.ViewGroup -> (0 until v.childCount).firstNotNullOfOrNull { find(v.getChildAt(it)) }
+            else -> null
+        }
+        val c = find(root) ?: return null
+        val wall = c.base - android.os.SystemClock.elapsedRealtime() + System.currentTimeMillis()
+        wall to (Build.VERSION.SDK_INT >= 24 && c.isCountDown)
+    }.getOrNull()
+
     private fun Notification.channelIdSafe(): String = if (Build.VERSION.SDK_INT >= 26) channelId.orEmpty() else ""
 
     private fun toLive(sbn: StatusBarNotification, kind: LiveKind): LiveInfo {
@@ -195,6 +212,7 @@ class NotifListener : NotificationListenerService() {
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val text = (ex.getCharSequence(Notification.EXTRA_TEXT) ?: ex.getCharSequence(Notification.EXTRA_SUB_TEXT))?.toString().orEmpty()
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) && n.`when` > 0
+        val customChrono = if (!chrono && (kind == LiveKind.Timer || kind == LiveKind.Stopwatch)) chronoInLayout(n) else null
         return LiveInfo(
             key = sbn.key,
             pkg = sbn.packageName,
@@ -204,8 +222,8 @@ class NotifListener : NotificationListenerService() {
             icon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
             chronoBase = when {
                 chrono -> n.`when`
-                // Timer sem cronômetro do sistema, mas com a hora de terminar no "when" (Relógio do Google).
-                kind == LiveKind.Timer && n.`when` > System.currentTimeMillis() -> n.`when`
+                // Timer com layout próprio (Relógio do Google): lê o cronômetro de dentro do layout.
+                (kind == LiveKind.Timer || kind == LiveKind.Stopwatch) && customChrono != null -> customChrono.first
                 // Sem cronômetro do sistema: sincroniza pelo tempo escrito na notificação
                 // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
                 kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
@@ -227,7 +245,7 @@ class NotifListener : NotificationListenerService() {
                 else -> 0L
             },
             countDown = (Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)) ||
-                (kind == LiveKind.Timer && !chrono && n.`when` > System.currentTimeMillis()),
+                (!chrono && customChrono?.second == true),
             progress = ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0).let { max -> if (max > 0) ex.getInt(Notification.EXTRA_PROGRESS, 0).toFloat() / max else -1f },
             appName = appLabel(this, sbn.packageName),
             smallIcon = n.smallIcon,

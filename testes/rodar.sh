@@ -44,6 +44,7 @@ caso whatsapp; sleep 1.5; shot "teste-whatsapp"
 sleep 6
 
 log "== Carregador e bateria (pelo Android) =="
+adb shell dumpsys battery unplug; sleep 3
 adb shell dumpsys battery set ac 1; sleep 1.5; shot "carregador-ligado"
 sleep 5
 adb shell dumpsys battery unplug; sleep 1.5; shot "carregador-desligado"
