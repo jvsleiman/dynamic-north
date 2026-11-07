@@ -89,8 +89,15 @@ class NotifListener : NotificationListenerService() {
         refresh()
     }
 
-    private fun isCall(sbn: StatusBarNotification) = sbn.notification.category == Notification.CATEGORY_CALL ||
-        (sbn.packageName in meetApps && sbn.isOngoing)
+    private fun isCall(sbn: StatusBarNotification): Boolean {
+        val n = sbn.notification
+        if (n.category == Notification.CATEGORY_CALL) return true
+        // Meet, Zoom e Teams: só reunião de verdade (CallStyle ou botão de atender/sair), não qualquer aviso contínuo.
+        if (sbn.packageName !in meetApps || !sbn.isOngoing) return false
+        val callType = if (Build.VERSION.SDK_INT >= 34) n.extras.getInt(Notification.EXTRA_CALL_TYPE, 0) else 0
+        val titles = n.actions.orEmpty().mapNotNull { it.title?.toString() }
+        return ongoingMeetingIsCall(titles, callType)
+    }
 
     private fun isRegular(sbn: StatusBarNotification): Boolean {
         val n = sbn.notification
@@ -221,8 +228,8 @@ class NotifListener : NotificationListenerService() {
     private val progressWords = listOf("baixando", "download", "instalando", "installing", "enviando", "upload")
 
     /**
-     * "Concluído" só quando o download que estava na ilha chega a 100% ou some depois de ter passado de 90%
-     * (a Play Store tira a notificação quando termina de instalar).
+     * "Concluído" quando o progresso chega a 100%, ou quando a notificação some depois de 90%
+     * e o último texto diz que terminou. Cancelar ou falhar não dispara o aviso.
      */
     private fun watchDone(now: LiveInfo?) {
         val prev = lastProgress
@@ -232,7 +239,13 @@ class NotifListener : NotificationListenerService() {
         lastProgress = cur
         if (prev == null) return
         val stillThere = runCatching { activeNotifications.any { it.key == prev.key } }.getOrDefault(false)
-        val finished = (now?.key == prev.key && now.progress >= 1f) || (now?.key != prev.key && !stillThere && maxSeen >= 0.9f)
+        val finished = downloadFinished(
+            progressedToComplete = now?.key == prev.key && now.progress >= 1f,
+            disappeared = now?.key != prev.key && !stillThere,
+            maxSeen = maxSeen,
+            lastTitle = prev.title,
+            lastText = prev.text,
+        )
         if (now?.key != prev.key && !stillThere && cur == null) maxSeen = 0f
         if (finished) IslandBus.show(Popup.Done(prev.title, prev.appName, prev.smallIcon, prev.color))
     }
@@ -337,14 +350,14 @@ class NotifListener : NotificationListenerService() {
         val n = sbn.notification
         val ex = n.extras
         val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return null
-        var text = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
-        if (!Prefs.state.value.showSensitive && isSensitive(title, text)) text = "Conteúdo sensível oculto"
+        val rawText = (ex.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
+        val redacted = redactNotice(title, rawText, messagesOf(ex), Prefs.state.value.showSensitive)
         return NotifItem(
             key = sbn.key,
             pkg = sbn.packageName,
             appName = appLabel(this, sbn.packageName),
-            title = title,
-            text = text,
+            title = redacted.title,
+            text = redacted.text,
             smallIcon = n.smallIcon,
             largeIcon = runCatching { n.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull(),
             contentIntent = n.contentIntent,
@@ -354,7 +367,7 @@ class NotifListener : NotificationListenerService() {
                 val t = a.title?.toString()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 NotifAction(t, a.actionIntent ?: return@mapNotNull null, a.remoteInputs?.firstOrNull { it.allowFreeFormInput })
             }.take(3),
-            messages = if (text == "Conteúdo sensível oculto") emptyList() else messagesOf(ex),
+            messages = redacted.messages,
             color = n.color,
         )
     }
@@ -376,12 +389,6 @@ class NotifListener : NotificationListenerService() {
             .takeLast(20)
     }
 
-    private fun isSensitive(title: String, text: String): Boolean {
-        val all = "$title $text".lowercase()
-        return Regex("\\b\\d{4,8}\\b").containsMatchIn(all) &&
-            listOf("código", "codigo", "code", "otp", "senha", "verifica", "token").any { it in all }
-    }
-
     private fun toCall(sbn: StatusBarNotification): CallInfo {
         val n = sbn.notification
         val ex = n.extras
@@ -389,11 +396,13 @@ class NotifListener : NotificationListenerService() {
         var answer: PendingIntent? = null
         var decline: PendingIntent? = null
         var incoming = !(n.flags and Notification.FLAG_ONGOING_EVENT != 0 && ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER))
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (Build.VERSION.SDK_INT >= 34) {
             when (ex.getInt(Notification.EXTRA_CALL_TYPE, 0)) {
                 Notification.CallStyle.CALL_TYPE_INCOMING -> incoming = true
                 Notification.CallStyle.CALL_TYPE_ONGOING -> incoming = false
             }
+        }
+        if (Build.VERSION.SDK_INT >= 31) {
             answer = getParcelable(ex, Notification.EXTRA_ANSWER_INTENT)
             decline = getParcelable(ex, Notification.EXTRA_DECLINE_INTENT) ?: getParcelable(ex, Notification.EXTRA_HANG_UP_INTENT)
         }

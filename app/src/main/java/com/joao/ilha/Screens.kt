@@ -582,8 +582,11 @@ fun UpdateScreen(back: () -> Unit) {
                                         status = UpdateStatus.Available(st.r)
                                     }.onFailure { e ->
                                         status = UpdateStatus.Failed(
-                                            if (e is java.io.IOException || e.message?.startsWith("HTTP") == true) "Sem conexão ou o servidor não respondeu. Tente de novo."
-                                            else "O download veio incompleto. Tente de novo.",
+                                            when {
+                                                e is java.io.IOException || e.message?.startsWith("HTTP") == true -> "Sem conexão ou o servidor não respondeu. Tente de novo."
+                                                e.message == "hash" -> "O arquivo baixado não confere com a versão publicada. Tente de novo."
+                                                else -> "O download veio incompleto. Tente de novo."
+                                            },
                                         )
                                     }
                                 }
@@ -635,7 +638,7 @@ fun HelpScreen(back: () -> Unit) {
             InfoText("Em Exibição, ajuste Horizontal e Vertical. Se o celular não informar a posição da câmera, desligue \"Centralizar na câmera\" e posicione à mão.")
         }
         Group("O que o Notch lê?") {
-            InfoText("Só as notificações, o player de música e o nome do app aberto (para esconder a ilha nos apps escolhidos). Nada sai do celular; a internet só é usada para procurar atualizações.")
+            InfoText("O Notch lê as notificações, o player de música e o nome do app aberto (para esconder a ilha). Com a sua permissão, também lê a agenda, os passos e a localização aproximada. Notificações, agenda, passos e água ficam no aparelho. A localização aproximada só sai do celular quando o clima está ligado: ela vai para o Open-Meteo. A internet também baixa a atualização do app, quando você pede.")
         }
     }
 }

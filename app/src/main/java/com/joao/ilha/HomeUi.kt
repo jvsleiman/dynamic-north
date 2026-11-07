@@ -52,9 +52,10 @@ private val BR = Locale("pt", "BR")
 private val CalColor = Color(0xFFFF453A)
 
 /** Altura da ilha principal conforme o que ela mostra. */
-internal fun homeHeight(s: Settings, weather: WeatherInfo?, agenda: AgendaInfo?): Dp {
+internal fun homeHeight(s: Settings, weather: WeatherInfo?, agenda: AgendaInfo?, weatherUnavailable: Boolean = false): Dp {
     var h = 80.dp + 44.dp
     if (s.homeWeather && weather != null) h += weatherCardHeight(weather) + 12.dp
+    else if (s.homeWeather && weatherUnavailable) h += 36.dp
     if (s.homeHealth) h += 58.dp
     if (s.homeAgenda && agenda != null) h += 56.dp + (if (agenda.next != null) 26.dp else 0.dp)
     return h
@@ -68,6 +69,7 @@ internal fun homeHeight(s: Settings, weather: WeatherInfo?, agenda: AgendaInfo?)
 internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
     val col = LocalIslandColors.current
     val weather by Weather.now.collectAsState()
+    val weatherMissing by Weather.unavailable.collectAsState()
     val agenda by Agenda.now.collectAsState()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -92,6 +94,10 @@ internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
         // Clima: cartão com fundo animado do tempo de agora, temperatura e as próximas horas
         weather?.takeIf { s.homeWeather }?.let { w ->
             WeatherCard(w)
+            Spacer(Modifier.height(12.dp))
+        }
+        if (s.homeWeather && weather == null && weatherMissing) {
+            Text("Sem localização recente para o clima", color = col.dim, fontSize = 13.sp, maxLines = 1)
             Spacer(Modifier.height(12.dp))
         }
         // Saúde

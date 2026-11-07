@@ -14,15 +14,20 @@ object Banks {
         "com.paypal.android.p2pmobile", "br.com.sicoobnet", "br.com.sicredi", "br.com.banrisul", "com.wise.android",
         "com.revolut.revolut", "br.com.willbank", "br.com.mobills", "br.com.digio", "br.com.bradesco.next",
     )
+    /** Palavras genéricas: só um segmento inteiro do pacote ("caixa", não "caixaferramentas"). */
+    private val segmentTokens = setOf("bank", "banco", "caixa", "bb")
+
+    /** Nomes específicos o bastante para procurar dentro do segmento. */
     private val parts = listOf(
-        "bank", "banco", "itau", "bradesco", "santander", "caixa", "sicredi", "sicoob", "banrisul", "nubank",
-        "picpay", "mercadopago", "pagbank", "pagseguro", "c6bank", "intermedium", "paypal", ".bb.", "btgpactual",
+        "itau", "bradesco", "santander", "sicredi", "sicoob", "banrisul", "nubank",
+        "picpay", "mercadopago", "pagbank", "pagseguro", "c6bank", "intermedium", "paypal", "btgpactual",
     )
 
     fun isBank(pkg: String?): Boolean {
         if (pkg.isNullOrEmpty() || pkg == Wallet.PKG) return false
         if (pkg in exact) return true
-        val p = pkg.lowercase()
-        return parts.any { it in p }
+        val segments = pkg.lowercase().split('.').filter { it.isNotEmpty() }
+        if (segments.any { it in segmentTokens }) return true
+        return segments.any { seg -> parts.any { token -> token in seg } }
     }
 }

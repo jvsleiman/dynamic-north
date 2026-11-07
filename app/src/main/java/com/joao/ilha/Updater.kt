@@ -18,7 +18,7 @@ import java.net.URL
 object Updater {
     private const val BASE = "https://raw.githubusercontent.com/jvsleiman/dynamic-north/releases/"
 
-    data class Release(val versionCode: Int, val versionName: String, val apk: String, val notes: String)
+    data class Release(val versionCode: Int, val versionName: String, val apk: String, val notes: String, val sha256: String)
 
     fun currentVersion(ctx: Context): Pair<Int, String> {
         val info = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
@@ -33,6 +33,8 @@ object Updater {
             versionName = json.getString("versionName"),
             apk = json.getString("apk"),
             notes = json.optString("notes"),
+            // Ausente nos version.json já publicados: a instalação segue e o Android confere a chave.
+            sha256 = json.optString("sha256"),
         )
     }
 
@@ -57,6 +59,10 @@ object Updater {
                 // Arquivo cortado no meio (conexão caiu): não tenta instalar um APK quebrado.
                 if (total > 0 && done != total) throw IllegalStateException("incompleto")
             }
+        }
+        if (!hashMatches(r.sha256, sha256Hex(out.readBytes()))) {
+            out.delete()
+            throw IllegalStateException("hash")
         }
         out
     }

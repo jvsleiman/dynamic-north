@@ -81,7 +81,7 @@ class IslandService : AccessibilityService() {
     private var lastBt: BluetoothInfo? = null
     private var lastBtEvent = ""
     private var lastBtAt = 0L
-    private var pending: Pair<Popup, Long>? = null
+    private var pending = emptyList<Pair<Popup, Long>>()
 
     private var lastDnd = false
     private var lastDndChange = 0L
@@ -197,11 +197,10 @@ class IslandService : AccessibilityService() {
         if (!locked.value) Health.screenOn()
         scope.launch { IslandBus.popups.collect { show(it) } }
         scope.launch {
-            ui.expanded.collect { open ->
-                val p = pending
-                if (!open && p != null) {
-                    pending = null
-                    if (System.currentTimeMillis() - p.second < 20_000) { delay(450); show(p.first) }
+            combine(ui.expanded, ui.popup) { open, pop -> open to pop }.collect { (open, pop) ->
+                if (!open && pop == null && pending.isNotEmpty()) {
+                    delay(450)
+                    if (!ui.expanded.value && ui.popup.value == null && pending.isNotEmpty()) showNextPending()
                 }
             }
         }
@@ -214,8 +213,14 @@ class IslandService : AccessibilityService() {
             Splash.markSeen(this@IslandService)
             show(Popup.Intro(), haptic = false)
         }
-        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
-        scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
+        scope.launch {
+            Prefs.state.collect {
+                reposition()
+                applyVisibility()
+                if (wantsStepCounter(it)) Health.startSteps(this@IslandService) else Health.stopSteps()
+            }
+        }
+        scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility(); showNextPending() } }
         scope.launch { combine(IslandBus.call, IslandBus.live, IslandBus.media) { _, _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
         scope.launch {
@@ -225,6 +230,7 @@ class IslandService : AccessibilityService() {
                     vibrate()
                 }
                 if (c == null && ui.expanded.value && IslandBus.media.value == null && IslandBus.notifications.value.isEmpty()) ui.expanded.value = false
+                if (c == null) showNextPending()
                 scheduleSleep()
             }
         }
@@ -258,6 +264,7 @@ class IslandService : AccessibilityService() {
                 if (on) AudioLevels.start(this@IslandService) else AudioLevels.stop()
             }
         }
+        scope.launch { healthReminders() }
     }
 
     // Sem ler o conteúdo das telas (muitos bancos bloqueiam apps que fazem isso): o app aberto
@@ -478,31 +485,40 @@ class IslandService : AccessibilityService() {
     }
 
     private fun cameraRect(): Rect? {
+        if (Build.VERSION.SDK_INT < 28) return null
         val cutout = when {
             Build.VERSION.SDK_INT >= 30 -> wm.currentWindowMetrics.windowInsets.displayCutout
             Build.VERSION.SDK_INT >= 29 ->
                 (getSystemService(DISPLAY_SERVICE) as DisplayManager).getDisplay(Display.DEFAULT_DISPLAY)?.cutout
-            else -> null
+            else -> view?.rootWindowInsets?.displayCutout
         } ?: return null
-        val top = if (Build.VERSION.SDK_INT >= 29) cutout.boundingRectTop else cutout.boundingRects.firstOrNull()
+        val top = if (Build.VERSION.SDK_INT >= 29) {
+            cutout.boundingRectTop
+        } else if (Build.VERSION.SDK_INT >= 28) {
+            cutout.boundingRects.firstOrNull()
+        } else {
+            null
+        }
         return top?.takeIf { !it.isEmpty }
     }
 
     // ---------- comportamento ----------
 
-    fun show(p: Popup, haptic: Boolean = true) {
-        if (view == null) return
+    fun show(p: Popup, haptic: Boolean = true): Boolean {
+        if (view == null) return false
         // Avisos da tela Testar sempre aparecem (mesmo com Não perturbe ou com a ilha aberta).
         val test = p is Popup.Test || p is Popup.Intro || (p is Popup.Notification && p.item.key.startsWith("demo-"))
-        if (IslandBus.call.value?.incoming == true && !test) return
-        if (!test && p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return
-        if (!test && p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return
-        if (!test && inGame()) return
-        if (!test && Banks.isBank(foregroundPkg.value)) return
+        if (IslandBus.call.value?.incoming == true && !test) return false
+        if (!test && p is Popup.Notification && locked.value && !Prefs.state.value.notifOnLockscreen) return false
+        if (!test && p is Popup.Notification && Prefs.state.value.respectDnd && dndActive()) return false
+        if (!test && inGame()) return false
+        if (!test && Banks.isBank(foregroundPkg.value)) return false
         if (ui.expanded.value && !test) {
             // Com a ilha aberta o aviso espera e aparece quando ela fechar (não se perde).
-            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet) pending = p to System.currentTimeMillis()
-            return
+            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet || p is Popup.Reminder) {
+                pending = rememberPending(pending, p, System.currentTimeMillis())
+            }
+            return p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet || p is Popup.Reminder
         }
         if (test) ui.expanded.value = false
         ui.asleep.value = false
@@ -511,7 +527,7 @@ class IslandService : AccessibilityService() {
         if (haptic && p !is Popup.Intro) vibrate()
         popupJob?.cancel()
         val s = Prefs.state.value
-        if (p is Popup.Notification && s.keepUntilRead) return
+        if (p is Popup.Notification && s.keepUntilRead) return true
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
         val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Wallet) Wallet.SHOW_MS else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
@@ -520,6 +536,19 @@ class IslandService : AccessibilityService() {
             ui.popup.value = null
             scheduleSleep()
         }
+        return true
+    }
+
+    /** Mostra o próximo aviso da fila que ainda está dentro do prazo. */
+    private fun showNextPending() {
+        if (pending.isEmpty() || ui.expanded.value || ui.popup.value != null || view == null) return
+        if (IslandBus.call.value?.incoming == true || inGame() || Banks.isBank(foregroundPkg.value)) return
+        val picked = nextPending(pending, System.currentTimeMillis()) ?: run {
+            pending = emptyList()
+            return
+        }
+        pending = picked.second
+        if (!show(picked.first)) pending = listOf(picked.first to System.currentTimeMillis()) + pending
     }
 
     // ---------- Não perturbe e modo de jogo ----------
@@ -653,17 +682,12 @@ class IslandService : AccessibilityService() {
             if (busy || locked.value) continue
             val using = Health.minutesUsing(now)
             if (s.breakReminder && using >= s.breakMinutes && now - lastBreak > s.breakMinutes * 60_000L) {
-                lastBreak = now
-                show(Popup.Reminder(ReminderKind.Break))
+                if (show(Popup.Reminder(ReminderKind.Break))) lastBreak = now
             } else if (s.waterReminder && Health.water.value < s.waterGoal && now - lastWater > 90 * 60_000L) {
-                lastWater = now
-                show(Popup.Reminder(ReminderKind.Water))
-            } else if (s.idleStyle == IdleStyle.Bedtime && Health.minutesToBed(s.bedtime) == 30) {
+                if (show(Popup.Reminder(ReminderKind.Water))) lastWater = now
+            } else if (s.idleStyle == IdleStyle.Bedtime && inBedtimeWindow(Health.minutesToBed(s.bedtime))) {
                 val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
-                if (day != bedDay) {
-                    bedDay = day
-                    show(Popup.Reminder(ReminderKind.Bedtime))
-                }
+                if (day != bedDay && show(Popup.Reminder(ReminderKind.Bedtime))) bedDay = day
             }
         }
     }

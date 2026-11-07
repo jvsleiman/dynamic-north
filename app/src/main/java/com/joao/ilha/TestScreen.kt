@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -215,6 +216,7 @@ object Demo {
     /** Clima de exemplo, só se ainda não houver o de verdade. */
     fun weather() {
         if (Weather.now.value != null) return
+        Weather.unavailable.value = false
         Weather.now.value = WeatherInfo(28, 2, true, listOf(HourForecast(11, 2, 29, true), HourForecast(12, 61, 30, true), HourForecast(13, 63, 31, true), HourForecast(14, 2, 29, true)), System.currentTimeMillis())
     }
 
@@ -314,7 +316,7 @@ fun TestScreen(back: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var tour by remember { mutableStateOf<Job?>(null) }
-    val running = IslandBus.serviceRunning.value
+    val running by IslandBus.serviceRunning.collectAsState()
     Page("Testar", back) {
         if (!running) Group { InfoText("Ative a acessibilidade do Notch para a ilha aparecer.") }
         Group(footer = "Mostra cada recurso por alguns segundos, um depois do outro.") {

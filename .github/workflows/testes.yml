@@ -1,5 +1,7 @@
 name: Bateria de testes
 
+# Não publica resultado a partir de outros branches. O push forçado em `testes`
+# só acontece depois de um push neste branch que mexa na bateria ou neste arquivo.
 on:
   push:
     branches: [claude/project-thread-nzugwz]

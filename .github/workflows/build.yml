@@ -1,5 +1,7 @@
 name: Build APK
 
+# Só estes dois branches publicam o APK sem assinatura no branch `builds`.
+# Push de branch de pull request não dispara este workflow.
 on:
   push:
     branches: [main, claude/project-thread-nzugwz]

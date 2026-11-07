@@ -6,7 +6,10 @@ import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
+import android.os.Looper
 import android.provider.CalendarContract
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AcUnit
@@ -21,7 +24,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -32,27 +38,88 @@ data class HourForecast(val hour: Int, val code: Int, val temp: Int, val day: Bo
 data class WeatherInfo(val temp: Int, val code: Int, val day: Boolean, val hours: List<HourForecast>, val at: Long)
 
 /** Clima pela Open-Meteo (sem chave): localização aproximada do celular, atualiza a cada 30 min. */
+private const val LOC_MAX_AGE = 30 * 60_000L
+
 object Weather {
     val now = MutableStateFlow<WeatherInfo?>(null)
+    /** Permissão concedida, mas sem posição recente para consultar o clima. */
+    val unavailable = MutableStateFlow(false)
 
     fun hasPermission(ctx: Context) =
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     suspend fun refresh(ctx: Context, force: Boolean = false) {
         val last = now.value
-        if (!force && last != null && System.currentTimeMillis() - last.at < 30 * 60_000) return
-        if (!hasPermission(ctx)) return
-        val loc = location(ctx) ?: return
-        val info = withContext(Dispatchers.IO) { runCatching { fetch(loc) }.getOrNull() } ?: return
+        if (!force && last != null && System.currentTimeMillis() - last.at < 30 * 60_000) {
+            unavailable.value = false
+            return
+        }
+        if (!hasPermission(ctx)) {
+            unavailable.value = false
+            return
+        }
+        val loc = location(ctx)
+        if (loc == null) {
+            unavailable.value = now.value == null
+            return
+        }
+        val info = withContext(Dispatchers.IO) { runCatching { fetch(loc) }.getOrNull() }
+        if (info == null) {
+            unavailable.value = now.value == null
+            return
+        }
         now.value = info
+        unavailable.value = false
     }
 
     @SuppressLint("MissingPermission")
-    private fun location(ctx: Context): Location? {
+    private suspend fun location(ctx: Context): Location? {
         val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER, LocationManager.GPS_PROVIDER)
+        val fresh = cached(lm)?.takeIf { System.currentTimeMillis() - it.time < LOC_MAX_AGE }
+        if (fresh != null) return fresh
+        val provider = when {
+            runCatching { lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }.getOrDefault(false) -> LocationManager.NETWORK_PROVIDER
+            runCatching { lm.isProviderEnabled(LocationManager.PASSIVE_PROVIDER) }.getOrDefault(false) -> LocationManager.PASSIVE_PROVIDER
+            else -> return null
+        }
+        return withTimeoutOrNull(8_000) { singleFix(lm, provider) } ?: cached(lm)?.takeIf { System.currentTimeMillis() - it.time < LOC_MAX_AGE }
+    }
+
+    private fun cached(lm: LocationManager): Location? =
+        listOf(LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
             .mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
             .maxByOrNull { it.time }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun singleFix(lm: LocationManager, provider: String): Location? = suspendCancellableCoroutine { cont ->
+        if (Build.VERSION.SDK_INT >= 30) {
+            val signal = android.os.CancellationSignal()
+            cont.invokeOnCancellation { signal.cancel() }
+            fun resumeOnce(loc: Location?) {
+                if (cont.isActive) runCatching { cont.resume(loc) }
+            }
+            runCatching {
+                lm.getCurrentLocation(provider, signal, { it.run() }) { loc -> resumeOnce(loc) }
+            }.onFailure { resumeOnce(null) }
+            return@suspendCancellableCoroutine
+        }
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                runCatching { lm.removeUpdates(this) }
+                if (cont.isActive) cont.resume(location)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {
+                runCatching { lm.removeUpdates(this) }
+                if (cont.isActive) cont.resume(null)
+            }
+        }
+        cont.invokeOnCancellation { runCatching { lm.removeUpdates(listener) } }
+        runCatching {
+            lm.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
+        }.onFailure { if (cont.isActive) cont.resume(null) }
     }
 
     private fun fetch(loc: Location): WeatherInfo {

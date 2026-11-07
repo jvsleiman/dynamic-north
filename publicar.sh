@@ -19,7 +19,7 @@ W="$T/rel"; git worktree add -q --detach "$W"
   git branch -D releases >/dev/null 2>&1 || true
   git checkout -q --orphan releases && git rm -rf -q --cached . && find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
   cp "$T/Ilha.apk" "Ilha-$NAME.apk"
-  python3 -c "import json,sys;print(json.dumps({'versionCode':int(sys.argv[1]),'versionName':sys.argv[2],'apk':'Ilha-'+sys.argv[2]+'.apk','notes':sys.argv[3]},ensure_ascii=False,indent=2))" "$CODE" "$NAME" "${1:-}" > version.json
+  python3 -c "import hashlib,json,sys; apk=sys.argv[4]; print(json.dumps({'versionCode':int(sys.argv[1]),'versionName':sys.argv[2],'apk':'Ilha-'+sys.argv[2]+'.apk','notes':sys.argv[3],'sha256':hashlib.sha256(open(apk,'rb').read()).hexdigest()},ensure_ascii=False,indent=2))" "$CODE" "$NAME" "${1:-}" "$T/Ilha.apk" > version.json
   git add -A && git commit -q -m "Ilha $NAME" && git push -q -f origin HEAD:releases )
 git worktree remove --force "$W"
 echo "Publicado Ilha $NAME ($CODE)"
