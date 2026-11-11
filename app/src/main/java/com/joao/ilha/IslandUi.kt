@@ -170,6 +170,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
     val focus by state.focus.collectAsState()
     val thread by state.thread.collectAsState()
     val weatherNow by Weather.now.collectAsState()
+    val weatherMissing by Weather.unavailable.collectAsState()
     val agendaNow by Agenda.now.collectAsState()
 
     // Atividades ao mesmo tempo: a principal fica na ilha e a outra na bolinha.
@@ -270,7 +271,7 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.Done -> wide to 70.dp * k * t
         // A animação NOTCH tem o formato do vídeo (240×136 pontos); a do cavalo é mais baixa.
         Mode.Intro -> if ((popup as? Popup.Intro)?.horse == true) wide to 132.dp * k else wide to wide * (136f / 240f)
-        Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
+        Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow, weatherMissing) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
             LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery, LiveKind.Parcel -> 64.dp
@@ -346,8 +347,10 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
 
     val density = LocalDensity.current
     // Área de toque = ilha + bolinhas. A janela desenhada é fixa, então isso não aparece na tela.
-    val touchW = tw + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
-    val touchH = th + 4.dp + if (mode.large) s.largeTopGap.dp else 0.dp
+    // A área de toque acompanha o tamanho desenhado. O destino (tw/th) já está grande
+    // enquanto a mola ainda cresce, e roubaria toques ao lado da ilha.
+    val touchW = w + 4.dp + if (hasSecond) (bubble + 6.dp) * 2 else 0.dp
+    val touchH = h + 4.dp + gap
     val targetW = with(density) { touchW.roundToPx() }
     val targetH = with(density) { touchH.roundToPx() }
     LaunchedEffect(targetW, targetH) { actions.onSize(targetW, targetH) }
@@ -514,9 +517,19 @@ private fun Island(
 /** Borda colorida girando em volta da ilha pequena. */
 @Composable
 private fun Modifier.animatedBorder(s: Settings): Modifier {
-    val t = rememberInfiniteTransition(label = "border")
     val period = (7 - s.borderAnimSpeed.coerceIn(1, 6)) * 700
-    val angle by t.animateFloat(0f, 360f, infiniteRepeatable(tween(period, easing = LinearEasing), RepeatMode.Restart), label = "angle")
+    var angle by remember(period) { mutableFloatStateOf(0f) }
+    LaunchedEffect(period) {
+        var last = System.currentTimeMillis()
+        while (true) {
+            IslandBus.awaitScreenOn()
+            val now = System.currentTimeMillis()
+            val dt = (now - last).coerceAtMost(50L)
+            last = now
+            angle = (angle + 360f * dt / period) % 360f
+            kotlinx.coroutines.delay(32)
+        }
+    }
     val brush = if (s.borderAnim == BorderAnim.Rainbow) {
         Brush.sweepGradient(listOf(Color(0xFFFF375F), Color(0xFFFF9F0A), Color(0xFFFFD60A), Color(0xFF30D158), Color(0xFF64D2FF), Color(0xFFBF5AF2), Color(0xFFFF375F)))
     } else {
@@ -1003,7 +1016,8 @@ private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
                     Timer(c.startedAt, Green, 13)
                 }
             }
-            Bars(true, Color(Prefs.state.value.callWaveColor), Modifier.size(24.dp))
+            val wave by Prefs.state.collectAsState()
+            Bars(true, Color(wave.callWaveColor), Modifier.size(24.dp))
         }
         Spacer(Modifier.weight(1f))
         // Só os botões que o app da chamada oferece (WhatsApp, Discord, telefone…).

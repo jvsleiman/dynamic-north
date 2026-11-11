@@ -1,11 +1,7 @@
 package com.joao.ilha
 
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -114,8 +110,7 @@ private fun shortSteps(n: Int) = if (n >= 10_000) "${n / 1000} mil" else formatS
 /** Bolinha que cresce e encolhe no ritmo de uma respiração calma. */
 @Composable
 private fun BreathDot(max: Dp) {
-    val tr = rememberInfiniteTransition(label = "breath")
-    val f by tr.animateFloat(0.4f, 1f, infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "f")
+    val f = rememberScreenOnPulse(0.4f, 1f, 8_000)
     Box(Modifier.size(max), contentAlignment = Alignment.Center) {
         Box(Modifier.size(max * f).alpha(0.4f + 0.6f * f).clip(CircleShape).background(BreathColor))
     }

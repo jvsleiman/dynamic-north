@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Ajustes, saúde e o relatório de crash ficam no aparelho. -->
+    <exclude domain="sharedpref" path="ilha.xml" />
+    <exclude domain="sharedpref" path="saude.xml" />
+    <exclude domain="file" path="ultimo-erro.txt" />
+</full-backup-content>

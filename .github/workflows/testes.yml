@@ -1,5 +1,7 @@
 name: Bateria de testes
 
+# Não publica resultado a partir de outros branches. O push forçado em `testes`
+# só acontece depois de um push neste branch que mexa na bateria ou neste arquivo.
 on:
   push:
     branches: [claude/project-thread-nzugwz]
@@ -21,7 +23,7 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - name: Compilar versão de testes
-        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+        run: chmod +x gradlew && ./gradlew assembleDebug testDebugUnitTest --no-daemon
       - name: Ativar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

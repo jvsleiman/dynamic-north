@@ -20,8 +20,8 @@ android {
         applicationId = "com.joao.ilha"
         minSdk = 26
         targetSdk = 35
-        versionCode = 36
-        versionName = "1.0.8"
+        versionCode = 37
+        versionName = "1.0.9"
     }
 
     signingConfigs {
@@ -74,4 +74,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.palette:palette-ktx:1.0.0")
+    testImplementation("junit:junit:4.13.2")
 }
