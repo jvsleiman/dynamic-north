@@ -45,6 +45,50 @@ jobs:
           name: Ilha-unsigned
           path: out/
 
+      # Com os segredos KEYSTORE_BASE64 e KEYSTORE_PASSWORD cadastrados no repositório, o APK é assinado
+      # e publicado no branch `releases` (lido pelo botão Atualizar). Sem eles, este passo só avisa.
+      - name: Assinar e publicar no branch releases
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ] || [ -z "${KEYSTORE_PASSWORD:-}" ]; then
+            echo "::warning::Segredos KEYSTORE_BASE64/KEYSTORE_PASSWORD não cadastrados: APK não foi assinado nem publicado."
+            exit 0
+          fi
+          CODE=$(grep -o 'versionCode = [0-9]*' app/build.gradle.kts | grep -o '[0-9]*')
+          NAME=$(grep -o 'versionName = "[^"]*"' app/build.gradle.kts | cut -d'"' -f2)
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          # Mesma versão já publicada: não publica de novo (suba o versionCode para lançar outra).
+          OLD=$(git fetch -q "$REMOTE" releases 2>/dev/null && git show FETCH_HEAD:version.json 2>/dev/null | python3 -c "import json,sys;print(json.load(sys.stdin)['versionCode'])" || echo 0)
+          if [ "$OLD" = "$CODE" ]; then
+            echo "::notice::Ilha $NAME ($CODE) já está publicada."
+            exit 0
+          fi
+          BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          SIGNER="$ANDROID_HOME/build-tools/$BT/apksigner"
+          echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/ilha.jks"
+          "$SIGNER" sign --ks "$RUNNER_TEMP/ilha.jks" --ks-key-alias ilha \
+            --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
+            --out "$RUNNER_TEMP/Ilha.apk" out/Ilha-unsigned.apk
+          rm -f "$RUNNER_TEMP/ilha.jks"
+          "$SIGNER" verify "$RUNNER_TEMP/Ilha.apk"
+          NOTES=$(head -1 notas-da-versao.txt 2>/dev/null || true)
+          R="$RUNNER_TEMP/releases"; mkdir -p "$R"
+          cp "$RUNNER_TEMP/Ilha.apk" "$R/Ilha-$NAME.apk"
+          CODE="$CODE" NAME="$NAME" NOTES="$NOTES" python3 -c "import json,os;print(json.dumps({'versionCode':int(os.environ['CODE']),'versionName':os.environ['NAME'],'apk':'Ilha-'+os.environ['NAME']+'.apk','notes':os.environ['NOTES']},ensure_ascii=False,indent=2))" > "$R/version.json"
+          cd "$R"
+          git init -q
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git checkout -q --orphan releases
+          git add -A
+          git commit -q -m "Ilha $NAME"
+          git push -q -f "$REMOTE" HEAD:releases
+          echo "::notice::Publicado Ilha $NAME ($CODE) no branch releases."
+
       - name: Publicar no branch builds
         run: |
           git config user.name "github-actions"

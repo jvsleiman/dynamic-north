@@ -1,0 +1,1 @@
+1.0.8: sem leitura de pagamentos; telas de encomenda, foco, transmissão, Quick Share e roteador; tocar na notificação abre o app; opção de esconder avisos do Android
