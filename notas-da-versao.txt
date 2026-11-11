@@ -1,1 +1,1 @@
-1.0.8: sem leitura de pagamentos; telas de encomenda, foco, transmissão, Quick Share e roteador; tocar na notificação abre o app; opção de esconder avisos do Android
+1.0.9: lembretes de pausa, água e dormir voltam a funcionar; clima pela localização aproximada; menos gasto de bateria; avisos esperam na fila com a ilha aberta; atualização confere o arquivo baixado

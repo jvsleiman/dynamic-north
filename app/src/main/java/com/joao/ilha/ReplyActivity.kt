@@ -23,6 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,8 @@ class ReplyActivity : ComponentActivity() {
             return
         }
         setContent {
-            IlhaTheme(Prefs.state.value.appTheme) {
+            val theme by Prefs.state.collectAsState()
+            IlhaTheme(theme.appTheme) {
                 val p = LocalPalette.current
                 var text by remember { mutableStateOf("") }
                 val focus = remember { FocusRequester() }

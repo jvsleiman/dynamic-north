@@ -1,5 +1,7 @@
 name: Build APK
 
+# Só estes dois branches publicam o APK sem assinatura no branch `builds`.
+# Push de branch de pull request não dispara este workflow.
 on:
   push:
     branches: [main, claude/project-thread-nzugwz]
@@ -78,7 +80,8 @@ jobs:
           NOTES=$(head -1 notas-da-versao.txt 2>/dev/null || true)
           R="$RUNNER_TEMP/releases"; mkdir -p "$R"
           cp "$RUNNER_TEMP/Ilha.apk" "$R/Ilha-$NAME.apk"
-          CODE="$CODE" NAME="$NAME" NOTES="$NOTES" python3 -c "import json,os;print(json.dumps({'versionCode':int(os.environ['CODE']),'versionName':os.environ['NAME'],'apk':'Ilha-'+os.environ['NAME']+'.apk','notes':os.environ['NOTES']},ensure_ascii=False,indent=2))" > "$R/version.json"
+          SHA=$(sha256sum "$R/Ilha-$NAME.apk" | cut -d" " -f1)
+          CODE="$CODE" NAME="$NAME" NOTES="$NOTES" SHA="$SHA" python3 -c "import json,os;print(json.dumps({'versionCode':int(os.environ['CODE']),'versionName':os.environ['NAME'],'apk':'Ilha-'+os.environ['NAME']+'.apk','notes':os.environ['NOTES'],'sha256':os.environ['SHA']},ensure_ascii=False,indent=2))" > "$R/version.json"
           cd "$R"
           git init -q
           git config user.name "github-actions"

@@ -2,7 +2,8 @@
 <!-- Só na versão de testes (debug): deixa a bateria de testes automática acionar os exemplos. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
-        <receiver android:name=".TestReceiver" android:exported="true">
+        <!-- DUMP é de desenvolvimento: o adb envia o teste; outro app não tem essa permissão. -->
+        <receiver android:name=".TestReceiver" android:exported="true" android:permission="android.permission.DUMP">
             <intent-filter>
                 <action android:name="com.joao.ilha.TESTE" />
             </intent-filter>

@@ -2,11 +2,7 @@ package com.joao.ilha
 
 import android.app.Notification
 import android.service.notification.StatusBarNotification
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -166,7 +162,7 @@ internal fun CompactOrder(l: LiveInfo, h: Dp) {
 
 @Composable
 private fun StepRing(st: OrderStep, modifier: Modifier) {
-    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(0.35f, 1f, infiniteRepeatable(tween(800), RepeatMode.Reverse), label = "a")
+    val pulse = rememberScreenOnPulse(0.35f, 1f, 1_600)
     Canvas(modifier) {
         val w = 2.6.dp.toPx()
         val gap = 14f
