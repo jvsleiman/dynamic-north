@@ -78,6 +78,8 @@ caso limpar; sleep 1
 for i in 1 2 3 4 5; do caso pedido; sleep 1.2; shot "pedido-aberto-$i"; sleep 3; shot "pedido-pequeno-$i"; done
 caso limpar; sleep 1
 log "== Telas novas: encomenda, foco, transmissão, Quick Share, roteador =="
+# O timer do relógio do teste anterior continuaria na ilha: encerra o app Relógio.
+adb shell am force-stop com.google.android.deskclock; sleep 1
 for i in 1 2 3 4; do caso encomenda; sleep 1.2; shot "encomenda-aberta-$i"; sleep 3; shot "encomenda-pequena-$i"; done
 caso limpar; sleep 1
 caso foco; sleep 1.2; shot "foco-aberto"; sleep 3; shot "foco-pequeno"

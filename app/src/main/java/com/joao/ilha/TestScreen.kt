@@ -314,7 +314,7 @@ object Demo {
                 delay(250)
             }
             IslandBus.live.value = null
-            IslandBus.show(Popup.Done("foto.jpg enviada", "Quick Share", null, 0xFF0A84FF.toInt()))
+            IslandBus.show(Popup.Done("foto.jpg enviada", "Quick Share", icon(ctx), 0xFF0A84FF.toInt()))
         }
     }
 

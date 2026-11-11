@@ -120,10 +120,11 @@ class NotifListener : NotificationListenerService() {
         val own = IslandBus.own.value
         IslandBus.live.value = when {
             best != null && (best.kind == LiveKind.Alarm || best.kind == LiveKind.Navigation) -> best
-            ord != null -> ord
-            // Download ou envio de arquivo não tira o Foco nem a encomenda da ilha.
-            best != null && best.kind != LiveKind.Progress && best.kind != LiveKind.Share -> best
+            // O Foco foi ligado pela própria pessoa: fica na frente até ela parar.
             own != null -> own
+            ord != null -> ord
+            // Download ou envio de arquivo não tira a encomenda da ilha.
+            best != null && best.kind != LiveKind.Progress && best.kind != LiveKind.Share -> best
             else -> currentParcel() ?: best
         }
         watchDone(IslandBus.live.value)

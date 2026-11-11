@@ -67,7 +67,10 @@ object Focus {
         val st = state.value ?: return
         val focus = st.phase == Phase.Focus
         if (announce) IslandBus.show(
-            Popup.Done(if (focus) "Foco terminado: hora da pausa" else "Pausa terminada: hora de focar", "Foco", null, if (focus) FOCUS_COLOR else BREAK_COLOR),
+            Popup.Done(
+                if (focus) "Foco terminado: hora da pausa" else "Pausa terminada: hora de focar", "Foco",
+                app?.let { android.graphics.drawable.Icon.createWithResource(it, R.drawable.ic_launcher_mono) }, if (focus) FOCUS_COLOR else BREAK_COLOR,
+            ),
         )
         if (focus) begin(Phase.Break, st.round) else begin(Phase.Focus, st.round + 1)
     }
