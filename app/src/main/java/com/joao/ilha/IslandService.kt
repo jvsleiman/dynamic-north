@@ -226,7 +226,7 @@ class IslandService : AccessibilityService() {
             Splash.markSeen(this@IslandService)
             show(Popup.Intro(), haptic = false)
         }
-        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
+        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService); SystemPopups.sync(this@IslandService, true) } }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
         scope.launch { combine(IslandBus.call, IslandBus.live, IslandBus.media) { _, _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
@@ -302,6 +302,8 @@ class IslandService : AccessibilityService() {
 
     override fun onDestroy() {
         IslandBus.serviceRunning.value = false
+        // Sem a ilha, os avisos do Android voltam.
+        SystemPopups.sync(this, false)
         IslandBus.expand = null
         runCatching { unregisterReceiver(receiver) }
         AudioLevels.stop()
