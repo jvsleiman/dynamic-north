@@ -226,7 +226,7 @@ class IslandService : AccessibilityService() {
             Splash.markSeen(this@IslandService)
             show(Popup.Intro(), haptic = false)
         }
-        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService) } }
+        scope.launch { Prefs.state.collect { reposition(); applyVisibility(); Health.startSteps(this@IslandService); SystemPopups.sync(this@IslandService, true) } }
         scope.launch { combine(foregroundPkg, locked) { _, _ -> }.collect { applyVisibility() } }
         scope.launch { combine(IslandBus.call, IslandBus.live, IslandBus.media) { _, _, _ -> }.collect { applyVisibility() } }
         // Chamada recebida sempre abre a ilha; quando acaba, recolhe.
@@ -302,6 +302,8 @@ class IslandService : AccessibilityService() {
 
     override fun onDestroy() {
         IslandBus.serviceRunning.value = false
+        // Sem a ilha, os avisos do Android voltam.
+        SystemPopups.sync(this, false)
         IslandBus.expand = null
         runCatching { unregisterReceiver(receiver) }
         AudioLevels.stop()
@@ -721,7 +723,7 @@ class IslandService : AccessibilityService() {
         }
         val popup = ui.popup.value
         if (tap && popup is Popup.Notification) {
-            runCatching { popup.item.contentIntent?.send() }
+            runCatching { popup.item.contentIntent?.launch() }
             ui.popup.value = null
             return
         }
@@ -750,7 +752,7 @@ class IslandService : AccessibilityService() {
             Gesture.OpenApp -> {
                 val live = IslandBus.live.value
                 if (IslandBus.call.value == null && live?.contentIntent != null && popup == null) {
-                    runCatching { live.contentIntent.send() }
+                    runCatching { live.contentIntent.launch() }
                     collapse()
                     return
                 }
@@ -798,7 +800,7 @@ class IslandService : AccessibilityService() {
             val i = Intent(this, ReplyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             runCatching { startActivity(i) }
         } else {
-            runCatching { action.intent.send() }
+            runCatching { action.intent.launch() }
         }
         collapse()
     }

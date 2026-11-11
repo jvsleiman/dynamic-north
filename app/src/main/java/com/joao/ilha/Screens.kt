@@ -260,6 +260,7 @@ fun NotificationsScreen(back: () -> Unit, go: (Screen) -> Unit) {
             SwitchRow("Botões da notificação", s.showNotifActions, "Responder, marcar como lida e outros, direto na ilha") { v -> s.set { copy(showNotifActions = v) } }
             NavRow("Ilha parada", s.idleStyle.label, divider = false) { go(Screen.Idle) }
         }
+        SystemPopupsGroup(s)
         Group("Não aparecem?", footer = "Desative e ative de novo o acesso às notificações do Notch.") {
             val ctx = LocalContext.current
             NavRow("Abrir acesso às notificações", divider = false) { open(ctx, "android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS") }
@@ -837,6 +838,36 @@ fun LiveScreen(back: () -> Unit) {
         }
         Group {
             NavRow("Testar aviso de bateria fraca", divider = false) { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) }
+        }
+    }
+}
+
+/** Avisos flutuantes do Android: some com eles para ficar só a ilha (precisa de permissão dada pelo computador). */
+@Composable
+private fun SystemPopupsGroup(s: Settings) {
+    val ctx = LocalContext.current
+    var allowed by remember { mutableStateOf(SystemPopups.allowed(ctx)) }
+    val lifecycle = LocalLifecycleOwner.current
+    LaunchedEffect(Unit) { lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { allowed = SystemPopups.allowed(ctx) } }
+    if (allowed) {
+        Group(
+            "Avisos do Android",
+            footer = "Os avisos que descem do topo da tela somem e fica só a ilha. As notificações continuam na barra, com som. Se a ilha ou as notificações do Notch forem desligadas, os avisos do Android voltam sozinhos. Chamadas com o celular desbloqueado também passam a aparecer só na ilha.",
+        ) {
+            SwitchRow("Esconder avisos do Android", s.hideSystemPopups, divider = false) { v -> s.set { copy(hideSystemPopups = v) } }
+        }
+    } else {
+        Group(
+            "Avisos do Android",
+            footer = "Para o Notch esconder os avisos que descem do topo, o Android exige uma permissão que só é liberada pelo computador, uma vez: ligue o celular com a depuração USB ativada e rode o comando no terminal. Depois volte aqui.",
+        ) {
+            InfoText(SystemPopups.GRANT_COMMAND)
+            NavRow("Copiar o comando", divider = false) {
+                runCatching {
+                    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                        .setPrimaryClip(android.content.ClipData.newPlainText("Notch", SystemPopups.GRANT_COMMAND))
+                }
+            }
         }
     }
 }

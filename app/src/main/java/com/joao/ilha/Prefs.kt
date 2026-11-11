@@ -108,6 +108,8 @@ data class Settings(
     val notifExpanded: Boolean = true,
     val blockedNotifApps: Set<String> = emptySet(),
     val showSensitive: Boolean = false,
+    /** Esconde os avisos flutuantes do próprio Android enquanto a ilha está ligada (precisa de permissão pelo ADB). */
+    val hideSystemPopups: Boolean = false,
     val popupSeconds: Int = 5,
     val keepUntilRead: Boolean = false,
     val swipeToDismiss: Boolean = true,

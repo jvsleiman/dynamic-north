@@ -171,3 +171,15 @@ object IslandBus {
         _popups.tryEmit(p)
     }
 }
+
+/**
+ * Dispara o toque de uma notificação (abrir o app, botões). No Android 14+ quem envia precisa
+ * autorizar a abertura de tela a partir do segundo plano, senão o toque não abre nada.
+ */
+fun PendingIntent.launch() {
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
+        val options = android.app.ActivityOptions.makeBasic()
+            .setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+        send(null, 0, null, null, null, null, options.toBundle())
+    } else send()
+}
