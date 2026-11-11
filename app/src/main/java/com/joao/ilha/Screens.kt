@@ -808,13 +808,17 @@ fun LiveScreen(back: () -> Unit) {
     Page("Ao vivo na ilha", back) {
         Group(
             "Atividades",
-            footer = "A ilha lê as notificações do app de relógio e do Maps/Waze. Tocar abre o painel com os botões do app (pausar, parar, sair); segurar abre o app.",
+            footer = "A ilha lê as notificações do app de relógio, do Maps/Waze e dos apps de comida, corrida, treino e compras. Tocar abre o painel com os botões do app (pausar, parar, sair); segurar abre o app.",
         ) {
             SwitchRow("Timer e cronômetro", s.liveEnabled, subtitle = "O tempo conta ao vivo na ilha") { v -> s.set { copy(liveEnabled = v) } }
+            SwitchRow("Pedidos, corridas, treinos e downloads", s.activitiesEnabled, subtitle = "iFood, Uber, 99, Strava, Play Store…") { v -> s.set { copy(activitiesEnabled = v) } }
+            SwitchRow("Encomendas", s.parcelEnabled, subtitle = "Enviado, em trânsito, saiu para entrega, entregue") { v -> s.set { copy(parcelEnabled = v) } }
+            SwitchRow("Transmissão, Quick Share e roteador", s.shareEnabled, subtitle = "Tela sendo transmitida, arquivo sendo enviado, roteador Wi‑Fi ligado") { v -> s.set { copy(shareEnabled = v) } }
             SwitchRow("Alarme tocando", s.alarmEnabled, subtitle = "Ilha grande com soneca e parar") { v -> s.set { copy(alarmEnabled = v) } }
             SwitchRow("Navegação (Maps, Waze)", s.navEnabled, subtitle = "Próxima curva e distância", divider = !s.navEnabled) { v -> s.set { copy(navEnabled = v) } }
             if (s.navEnabled) SwitchRow("Abrir a cada nova instrução", s.navAutoExpand, subtitle = "A ilha cresce por 3 segundos quando muda a próxima curva", divider = false) { v -> s.set { copy(navAutoExpand = v) } }
         }
+        FocusGroup(s)
         Group(footer = "Aparecem por um instante quando você muda o modo da campainha, liga ou desliga o Não perturbe ou desbloqueia o celular.") {
             SwitchRow("Avisos do sistema", s.statusAlerts, divider = false) { v -> s.set { copy(statusAlerts = v) } }
         }
@@ -834,6 +838,18 @@ fun LiveScreen(back: () -> Unit) {
         Group {
             NavRow("Testar aviso de bateria fraca", divider = false) { IslandBus.show(Popup.Reminder(ReminderKind.BatteryLow)) }
         }
+    }
+}
+
+/** Foco (Pomodoro): tempos e o botão de começar/parar. */
+@Composable
+private fun FocusGroup(s: Settings) {
+    val ctx = LocalContext.current
+    val focus by Focus.state.collectAsState()
+    Group("Foco", footer = "Um período de foco e uma pausa, um depois do outro, contando na ilha. Na ilha aberta dá para pausar, pular a etapa e parar. Também começa pelo botão Foco da ilha principal.") {
+        SliderRow("Tempo de foco", s.focusMinutes, 5..90, " min") { v -> s.set { copy(focusMinutes = v) } }
+        SliderRow("Tempo de pausa", s.focusBreakMinutes, 1..30, " min") { v -> s.set { copy(focusBreakMinutes = v) } }
+        NavRow(if (focus == null) "Começar foco" else "Parar foco", divider = false) { if (focus == null) Focus.start(ctx) else Focus.stop() }
     }
 }
 

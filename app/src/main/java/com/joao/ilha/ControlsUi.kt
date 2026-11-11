@@ -47,6 +47,7 @@ import androidx.compose.material.icons.rounded.ScreenRotation
 import androidx.compose.material.icons.rounded.Vibration
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -307,6 +308,8 @@ internal fun StatusPopup(kind: StatusKind, h: Dp) {
         StatusKind.DndOn -> Triple(Icons.Rounded.DoNotDisturbOn, "Não perturbe", Color(0xFF5E5CE6))
         StatusKind.DndOff -> Triple(Icons.Rounded.DoNotDisturbOff, "Não perturbe desligado", col.dim)
         StatusKind.Unlocked -> Triple(Icons.Rounded.LockOpen, "", col.text)
+        StatusKind.HotspotOn -> Triple(Icons.Rounded.WifiTethering, "Roteador Wi‑Fi", Color(0xFF34C759))
+        StatusKind.HotspotOff -> Triple(Icons.Rounded.WifiTethering, "Roteador desligado", col.dim)
     }
     if (kind == StatusKind.Unlocked) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(icon, null, tint = tint, modifier = Modifier.size(h * 0.46f)) }

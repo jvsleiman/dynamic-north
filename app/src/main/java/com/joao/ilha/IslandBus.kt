@@ -64,7 +64,17 @@ data class CallInfo(
     val video: Boolean = false,
 )
 
-enum class LiveKind { Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip, Workout, Delivery }
+enum class LiveKind {
+    Timer, Stopwatch, Alarm, Navigation, Recording, Progress, Trip, Workout, Delivery,
+    /** Encomenda (lojas e rastreio). */
+    Parcel,
+    /** Foco/Pomodoro do próprio Notch. */
+    Focus,
+    /** Transmissão ou compartilhamento da tela. */
+    Cast,
+    /** Envio ou recebimento de arquivo (Quick Share). */
+    Share,
+}
 
 /** Atividade ao vivo lida de outra notificação: timer, cronômetro, alarme tocando ou navegação. */
 data class LiveInfo(
@@ -95,7 +105,7 @@ enum class BtKind { Earbuds, Headphones, Watch, Speaker, Other }
 
 data class BluetoothInfo(val name: String, val kind: BtKind, val connected: Boolean, val battery: Int?)
 
-enum class StatusKind { Ring, Vibrate, Silent, DndOn, DndOff, Unlocked }
+enum class StatusKind { Ring, Vibrate, Silent, DndOn, DndOff, Unlocked, HotspotOn, HotspotOff }
 
 enum class ReminderKind { Break, Water, Bedtime, BatteryLow, BatteryFull }
 
@@ -121,6 +131,10 @@ object IslandBus {
     val notifications = MutableStateFlow<List<NotifItem>>(emptyList())
     val call = MutableStateFlow<CallInfo?>(null)
     val live = MutableStateFlow<LiveInfo?>(null)
+    /** Atividade do próprio Notch (Foco); o leitor de notificações junta com as dos outros apps. */
+    val own = MutableStateFlow<LiveInfo?>(null)
+    /** Relatório de como o Notch está lendo as notificações de agora (tela Testar). */
+    @Volatile var report: (() -> String)? = null
     /** Algum app usando a câmera / o microfone agora. */
     val cameraInUse = MutableStateFlow(false)
     val micInUse = MutableStateFlow(false)

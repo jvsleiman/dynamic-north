@@ -10,6 +10,11 @@ import androidx.compose.material.icons.automirrored.rounded.DirectionsRun
 import androidx.compose.material.icons.rounded.DeliveryDining
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CallEnd
+import androidx.compose.material.icons.rounded.Cast
+import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.Timelapse
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DirectionsCar
@@ -89,12 +94,18 @@ private fun LiveInfo.vector(): ImageVector = when (kind) {
     LiveKind.Trip -> Icons.Rounded.DirectionsCar
     LiveKind.Workout -> Icons.AutoMirrored.Rounded.DirectionsRun
     LiveKind.Delivery -> Icons.Rounded.DeliveryDining
+    LiveKind.Parcel -> Icons.Rounded.Inventory2
+    LiveKind.Focus -> Icons.Rounded.Timelapse
+    LiveKind.Cast -> Icons.Rounded.Cast
+    LiveKind.Share -> Icons.Rounded.Share
 }
 
 private fun LiveInfo.tint(): Color = when (kind) {
-    LiveKind.Navigation -> NavColor
+    LiveKind.Navigation, LiveKind.Cast, LiveKind.Share -> NavColor
     LiveKind.Recording -> RecColor
     LiveKind.Progress -> CamColor
+    LiveKind.Parcel -> if (color != 0) Color(color).copy(alpha = 1f) else ParcelColor
+    LiveKind.Focus -> if (color != 0) Color(color).copy(alpha = 1f) else TimerColor
     LiveKind.Trip, LiveKind.Delivery -> if (color != 0) Color(color).copy(alpha = 1f) else NavColor
     LiveKind.Workout -> if (color != 0) Color(color).copy(alpha = 1f) else Color(0xFFFC4C02)
     else -> TimerColor
@@ -157,10 +168,16 @@ internal fun CompactLive(l: LiveInfo, h: Dp) {
                 Icon(Icons.Rounded.Mic, null, tint = col.text, modifier = Modifier.size((h - 14.dp) * ic))
             }
             LiveKind.Delivery -> CompactOrder(l, h)
+            LiveKind.Parcel -> CompactParcel(l, h)
             // Download: ícone do app e anel de progresso.
             LiveKind.Progress -> {
                 AppGlyph(l, (h - 12.dp) * ic)
                 ProgressRing(l.progress, CamColor, h - 12.dp, 2.5.dp)
+            }
+            // Quick Share: ícone de compartilhar e anel de progresso azul.
+            LiveKind.Share -> {
+                Icon(l.vector(), null, tint = l.tint(), modifier = Modifier.size((h - 14.dp) * ic))
+                ProgressRing(l.progress, NavColor, h - 12.dp, 2.5.dp)
             }
             LiveKind.Workout -> {
                 Icon(l.vector(), null, tint = l.tint(), modifier = Modifier.size((h - 12.dp) * ic))
@@ -233,9 +250,10 @@ internal fun ProgressRing(progress: Float, color: Color, size: Dp, stroke: Dp, d
 internal fun ExpandedLive(l: LiveInfo) {
     when (l.kind) {
         LiveKind.Navigation -> ExpandedNav(l)
-        LiveKind.Progress -> ExpandedProgress(l)
+        LiveKind.Progress, LiveKind.Share -> ExpandedProgress(l)
         LiveKind.Trip -> ExpandedTrip(l)
         LiveKind.Delivery -> ExpandedOrder(l)
+        LiveKind.Parcel -> ExpandedParcel(l)
         LiveKind.Workout -> ExpandedWorkout(l)
         else -> ExpandedTimer(l)
     }
@@ -317,6 +335,8 @@ private fun ExpandedTimer(l: LiveInfo) {
     val label = when (l.kind) {
         LiveKind.Timer -> "Timer"
         LiveKind.Recording -> "Gravando"
+        LiveKind.Cast -> "Transmitindo"
+        LiveKind.Focus -> l.appName.ifBlank { "Foco" }
         else -> "Cronômetro"
     }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp)) {
@@ -368,17 +388,23 @@ private fun ExpandedTimer(l: LiveInfo) {
 private fun ExpandedProgress(l: LiveInfo) {
     val col = LocalIslandColors.current
     Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-        AppGlyph(l, 44.dp)
+        val share = l.kind == LiveKind.Share
+        val ringColor = if (share) NavColor else CamColor
+        if (share) {
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(NavColor), contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Share, null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
+        } else AppGlyph(l, 44.dp)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(l.appName.ifBlank { "Baixando" }, color = col.dim, fontSize = 12.sp, maxLines = 1)
+            Text(if (share) "Quick Share" else l.appName.ifBlank { "Baixando" }, color = col.dim, fontSize = 12.sp, maxLines = 1)
             Text(l.title.ifBlank { l.text }, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // Texto do próprio sistema ("45 MB de 100 MB", "Instalando…").
             if (l.title.isNotBlank() && l.text.isNotBlank()) Text(l.text, color = col.dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
         Box(contentAlignment = Alignment.Center) {
-            ProgressRing(l.progress, CamColor, 46.dp, 3.5.dp)
+            ProgressRing(l.progress, ringColor, 46.dp, 3.5.dp)
             if (l.progress >= 0f) Text("${(l.progress.coerceIn(0f, 1f) * 100).toInt()}%", color = col.text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -417,6 +443,7 @@ internal fun actionIcon(title: String): Pair<ImageVector, Boolean>? {
         has("vídeo", "video", "câmera", "camera") -> Icons.Rounded.Videocam to false
         has("retomar", "continuar", "resume", "iniciar", "start") -> Icons.Rounded.PlayArrow to true
         has("pausar", "pause") -> Icons.Rounded.Pause to true
+        has("pular", "skip") -> Icons.Rounded.SkipNext to false
         has("soneca", "snooze", "adiar") -> Icons.Rounded.Snooze to false
         has("volta", "lap") -> Icons.Rounded.Flag to false
         has("+1", "adicionar 1", "add 1") -> Icons.Rounded.Add to false

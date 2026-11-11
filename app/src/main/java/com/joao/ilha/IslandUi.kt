@@ -273,16 +273,16 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
-            LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery -> 64.dp
+            LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery, LiveKind.Parcel -> 64.dp
             LiveKind.Recording -> 44.dp
             else -> 28.dp
         } to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
         Mode.ExpandedLive -> wide to live.let { l ->
             when {
-                l?.kind == LiveKind.Delivery -> if (l.title.isNotBlank()) 212.dp else 186.dp
-                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
-                l.kind == LiveKind.Progress -> 78.dp
+                l?.kind == LiveKind.Delivery || l?.kind == LiveKind.Parcel -> if (l?.title?.isNotBlank() == true) 212.dp else 186.dp
+                l?.kind == LiveKind.Progress || l?.kind == LiveKind.Share -> 78.dp
+                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> 92.dp
                 l.kind == LiveKind.Trip -> if (l.actions.isEmpty()) 128.dp else 168.dp
                 l.kind == LiveKind.Workout -> if (l.actions.isEmpty()) 104.dp else 150.dp
                 // Botões redondos ficam ao lado do tempo, na mesma linha.

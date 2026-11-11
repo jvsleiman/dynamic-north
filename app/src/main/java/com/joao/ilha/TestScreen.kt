@@ -245,7 +245,8 @@ object Demo {
             LiveKind.Alarm -> LiveInfo("demo-live", ctx.packageName, kind, "Alarme", "07:00 · Acordar", null, 0, false, null, listOf(NotifAction("Soneca", openApp(ctx), null), NotifAction("Parar", openApp(ctx), null)))
             LiveKind.Navigation -> LiveInfo("demo-live", ctx.packageName, kind, "200 m", "Vire à direita na Av. Paulista", null, 0, false, null, listOf(NotifAction("Sair", openApp(ctx), null)))
             LiveKind.Recording -> LiveInfo("demo-live", ctx.packageName, kind, "Gravação 2", "", null, now, false, null, listOf(NotifAction("Parar", openApp(ctx), null), NotifAction("Pausar", openApp(ctx), null)))
-            LiveKind.Progress, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery -> null
+            LiveKind.Cast -> LiveInfo("demo-live", ctx.packageName, kind, "Transmitindo a tela", "Sala de estar", null, now, false, null, listOf(NotifAction("Parar", openApp(ctx), null)))
+            LiveKind.Progress, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery, LiveKind.Parcel, LiveKind.Focus, LiveKind.Share -> null
         }
     }
 
@@ -288,7 +289,37 @@ object Demo {
         )
     }
 
+    private var parcelStep = 0
+
+    /** Encomenda: cada toque avança uma etapa (enviado → em trânsito → saiu para entrega → entregue). */
+    fun parcel(ctx: Context) {
+        val steps = listOf(ParcelStep.Shipped, ParcelStep.InTransit, ParcelStep.OutForDelivery, ParcelStep.Delivered)
+        val st = steps[parcelStep % steps.size]
+        parcelStep++
+        IslandBus.live.value = LiveInfo(
+            "demo-encomenda-${st.ordinal}", ctx.packageName, LiveKind.Parcel, "Fone de ouvido sem fio", st.hint,
+            null, 0, false, openApp(ctx), emptyList(), appName = "Loja de exemplo", color = 0,
+            step = st.ordinal, eta = if (st == ParcelStep.InTransit) "Amanhã" else if (st == ParcelStep.OutForDelivery) "Hoje" else "",
+        )
+    }
+
+    /** Quick Share: arquivo sendo enviado, com a porcentagem. */
+    fun share(ctx: Context, scope: kotlinx.coroutines.CoroutineScope) {
+        scope.launch {
+            for (p in 0..20) {
+                IslandBus.live.value = LiveInfo(
+                    "demo-share", ctx.packageName, LiveKind.Share, "Enviando para Galaxy da Ana", "foto.jpg · ${p * 5}%", null, 0, false, null, emptyList(),
+                    progress = p / 20f, appName = "Quick Share",
+                )
+                delay(250)
+            }
+            IslandBus.live.value = null
+            IslandBus.show(Popup.Done("foto.jpg enviada", "Quick Share", null, 0xFF0A84FF.toInt()))
+        }
+    }
+
     fun stopLive() {
+        Focus.stop()
         IslandBus.live.value = null
         IslandBus.refresh?.invoke()
     }
@@ -313,6 +344,7 @@ fun TestScreen(back: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var tour by remember { mutableStateOf<Job?>(null) }
+    var report by remember { mutableStateOf<String?>(null) }
     val running = IslandBus.serviceRunning.value
     Page("Testar", back) {
         if (!running) Group { InfoText("Ative a acessibilidade do Notch para a ilha aparecer.") }
@@ -376,6 +408,10 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Corrida") { Demo.trip(ctx) }
             NavRow("Pedido de comida (toque de novo para avançar)") { Demo.order(ctx) }
             NavRow("Treino (Strava, Google Fit)") { Demo.workout(ctx) }
+            NavRow("Encomenda (toque de novo para avançar)") { Demo.parcel(ctx) }
+            NavRow("Foco (Pomodoro)") { Focus.start(ctx) }
+            NavRow("Transmissão de tela") { Demo.live(ctx, LiveKind.Cast) }
+            NavRow("Quick Share") { Demo.share(ctx, scope) }
             NavRow("Navegação", icon = Icons.Rounded.Navigation, iconColor = Color(0xFF0A84FF)) { Demo.live(ctx, LiveKind.Navigation) }
             NavRow("Alarme tocando", icon = Icons.Rounded.Alarm, iconColor = Color(0xFFFF9500)) { Demo.live(ctx, LiveKind.Alarm) }
             NavRow("Parar ao vivo", divider = false) { Demo.stopLive() }
@@ -389,6 +425,7 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Modo silencioso") { IslandBus.show(Popup.Status(StatusKind.Silent)) }
             NavRow("Não perturbe") { IslandBus.show(Popup.Status(StatusKind.DndOn)) }
             NavRow("Desbloqueio") { IslandBus.show(Popup.Status(StatusKind.Unlocked)) }
+            NavRow("Roteador Wi‑Fi ligado") { IslandBus.show(Popup.Status(StatusKind.HotspotOn)) }
             NavRow("Câmera em uso") { Demo.privacy(true) }
             NavRow("Microfone em uso") { Demo.privacy(false) }
             NavRow("Aviso de teste") { IslandBus.show(Popup.Test) }
@@ -403,6 +440,17 @@ fun TestScreen(back: () -> Unit) {
             NavRow("Bateria") { IslandBus.expand?.invoke(ExpandKind.Battery) }
             NavRow("Saúde") { IslandBus.expand?.invoke(ExpandKind.Health) }
             NavRow("Lista de notificações", divider = false) { IslandBus.expand?.invoke(ExpandKind.Notifications) }
+        }
+        Group("Diagnóstico", footer = "Mostra como o Notch está lendo cada notificação que está na barra agora (apps de banco ficam de fora). Se uma tela não aparecer com algum app, deixe a notificação dele aberta, toque aqui e mande o texto: ele também é copiado.") {
+            NavRow("Ler as notificações de agora", divider = report != null) {
+                val r = IslandBus.report?.invoke() ?: "O acesso às notificações está desligado."
+                report = r
+                runCatching {
+                    (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                        .setPrimaryClip(android.content.ClipData.newPlainText("Notch", r))
+                }
+            }
+            report?.let { InfoText(it) }
         }
         Group {
             NavRow("Limpar todos os testes", icon = Icons.Rounded.Stop, iconColor = Color(0xFFFF3B30), divider = false) {

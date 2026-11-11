@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.DirectionsWalk
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Timelapse
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.WaterDrop
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,6 +69,7 @@ internal fun homeHeight(s: Settings, weather: WeatherInfo?, agenda: AgendaInfo?)
 @Composable
 internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
     val col = LocalIslandColors.current
+    val ctx = LocalContext.current
     val weather by Weather.now.collectAsState()
     val agenda by Agenda.now.collectAsState()
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -118,6 +121,11 @@ internal fun HomeCard(s: Settings, notifCount: Int, actions: IslandActions) {
                 IslandBus.expand?.invoke(ExpandKind.Notifications)
             }
             HomeButton(Icons.Rounded.Tune, "Controles", Modifier.weight(1f)) { IslandBus.expand?.invoke(ExpandKind.Controls) }
+            // Foco (Pomodoro): começa e já abre a ilha na contagem.
+            HomeButton(Icons.Rounded.Timelapse, "Foco", Modifier.weight(0.7f)) {
+                if (Focus.state.value == null) Focus.start(ctx)
+                IslandBus.expand?.invoke(ExpandKind.Activity)
+            }
         }
     }
 }
