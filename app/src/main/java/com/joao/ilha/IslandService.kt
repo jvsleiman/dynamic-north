@@ -501,7 +501,7 @@ class IslandService : AccessibilityService() {
         if (!test && Banks.isBank(foregroundPkg.value)) return
         if (ui.expanded.value && !test) {
             // Com a ilha aberta o aviso espera e aparece quando ela fechar (não se perde).
-            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet) pending = p to System.currentTimeMillis()
+            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done) pending = p to System.currentTimeMillis()
             return
         }
         if (test) ui.expanded.value = false
@@ -514,7 +514,7 @@ class IslandService : AccessibilityService() {
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
-        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Wallet) Wallet.SHOW_MS else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
+        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
             delay(duration)
             ui.popup.value = null

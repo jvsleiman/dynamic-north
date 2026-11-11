@@ -54,18 +54,8 @@ class NotifListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // Notificações de banco não passam pelo Notch.
+        // Notificações de banco, carteira e pagamento não passam pelo Notch.
         if (Banks.isBank(sbn.packageName)) return
-        // Pagamento por aproximação da Google Carteira: animação do cartão, como no iPhone.
-        if (sbn.packageName == Wallet.PKG && Prefs.state.value.notifEnabled) {
-            val art = runCatching { sbn.notification.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull()
-            val pay = Wallet.parse(sbn, art)
-            if (pay != null) {
-                val sig = pay.amount + "\u0000" + pay.merchant
-                if (lastShown[sbn.key] != sig) { lastShown[sbn.key] = sig; IslandBus.show(Popup.Wallet(pay)) }
-                return
-            }
-        }
         val isOrder = trackOrder(sbn)
         refresh()
         // Status do pedido vira a atividade "Pedido" na ilha (não aparece de novo como notificação comum).
