@@ -35,9 +35,14 @@ class NotifListener : NotificationListenerService() {
         IslandBus.listenerConnected.value = true
         IslandBus.dismiss = { key -> if (key == null) cancelAllNotifications() else cancelNotification(key) }
         IslandBus.refresh = { pickController(); refresh() }
+        IslandBus.report = { report() }
         sessions = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         runCatching { sessions?.addOnActiveSessionsChangedListener(sessionsListener, ComponentName(this, NotifListener::class.java)) }
         pickController()
+        // Pedido ou encomenda que já estava nas notificações quando o leitor ligou.
+        runCatching { activeNotifications }.getOrNull().orEmpty()
+            .filterNot { Banks.isBank(it.packageName) }.sortedBy { it.postTime }
+            .forEach { if (!trackOrder(it)) trackParcel(it) }
         refresh()
     }
 
@@ -45,30 +50,22 @@ class NotifListener : NotificationListenerService() {
         IslandBus.listenerConnected.value = false
         IslandBus.dismiss = null
         IslandBus.refresh = null
+        IslandBus.report = null
         runCatching { sessions?.removeOnActiveSessionsChangedListener(sessionsListener) }
         controller?.unregisterCallback(callback)
         controller = null
         IslandBus.media.value = null
         IslandBus.call.value = null
-        IslandBus.live.value = null
+        // O Foco é do próprio Notch: continua na ilha mesmo sem o leitor.
+        IslandBus.live.value = IslandBus.own.value
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        // Notificações de banco não passam pelo Notch.
+        // Notificações de banco, carteira e pagamento não passam pelo Notch.
         if (Banks.isBank(sbn.packageName)) return
-        // Pagamento por aproximação da Google Carteira: animação do cartão, como no iPhone.
-        if (sbn.packageName == Wallet.PKG && Prefs.state.value.notifEnabled) {
-            val art = runCatching { sbn.notification.getLargeIcon()?.loadDrawable(this)?.toBitmapSafe() }.getOrNull()
-            val pay = Wallet.parse(sbn, art)
-            if (pay != null) {
-                val sig = pay.amount + "\u0000" + pay.merchant
-                if (lastShown[sbn.key] != sig) { lastShown[sbn.key] = sig; IslandBus.show(Popup.Wallet(pay)) }
-                return
-            }
-        }
-        val isOrder = trackOrder(sbn)
+        val isOrder = trackOrder(sbn) || trackParcel(sbn)
         refresh()
-        // Status do pedido vira a atividade "Pedido" na ilha (não aparece de novo como notificação comum).
+        // Status do pedido ou da encomenda vira atividade na ilha (não aparece de novo como notificação comum).
         if (isOrder) return
         val s = Prefs.state.value
         if (!s.notifEnabled || sbn.packageName in s.blockedNotifApps) return
@@ -115,15 +112,20 @@ class NotifListener : NotificationListenerService() {
         val best = list
             .mapNotNull { sbn -> liveKind(sbn)?.let { sbn to it } }
             // Alarme tocando tem prioridade; depois navegação; depois timers.
-            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress }, { it.first.key != lastProgress?.key }, { -it.first.postTime }))
+            .sortedWith(compareBy<Pair<StatusBarNotification, LiveKind>>({ it.second != LiveKind.Alarm }, { it.second != LiveKind.Navigation }, { it.second == LiveKind.Progress || it.second == LiveKind.Share }, { it.first.key != lastProgress?.key }, { -it.first.postTime }))
             .firstOrNull()
             ?.let { (sbn, kind) -> toLive(sbn, kind) }
         // Pedido de comida em andamento vem logo depois de alarme e navegação.
         val ord = currentOrder()
+        val own = IslandBus.own.value
         IslandBus.live.value = when {
             best != null && (best.kind == LiveKind.Alarm || best.kind == LiveKind.Navigation) -> best
+            // O Foco foi ligado pela própria pessoa: fica na frente até ela parar.
+            own != null -> own
             ord != null -> ord
-            else -> best
+            // Download ou envio de arquivo não tira a encomenda da ilha.
+            best != null && best.kind != LiveKind.Progress && best.kind != LiveKind.Share -> best
+            else -> currentParcel() ?: best
         }
         watchDone(IslandBus.live.value)
     }
@@ -136,7 +138,10 @@ class NotifListener : NotificationListenerService() {
         if (pkg == packageName || isCall(sbn) || n.category == Notification.CATEGORY_TRANSPORT) return null
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
         val clockApp = "clock" in pkg || "alarm" in pkg || pkg == "com.sec.android.app.clockpackage"
-        if (n.category == Notification.CATEGORY_NAVIGATION || pkg in navApps) return if (s.navEnabled && sbn.isOngoing) LiveKind.Navigation else null
+        val ex = n.extras
+        val hasBar = ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0 || ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE)
+        // App de mapas com barra de progresso está baixando um mapa, não navegando.
+        if (n.category == Notification.CATEGORY_NAVIGATION || (pkg in navApps && !hasBar)) return if (s.navEnabled && sbn.isOngoing) LiveKind.Navigation else null
         if (n.category == Notification.CATEGORY_ALARM && (n.fullScreenIntent != null || clockApp && sbn.isOngoing)) {
             // Lembrete de "próximo alarme" não tem tela cheia e não é contínuo.
             return if (s.alarmEnabled && n.fullScreenIntent != null) LiveKind.Alarm else null
@@ -149,29 +154,66 @@ class NotifListener : NotificationListenerService() {
             if (("stopwatch" in ch || "cronômetro" in ch || "cronometro" in ch) && n.actions?.isNotEmpty() == true) return LiveKind.Stopwatch
         }
         if (!sbn.isOngoing) return null
-        val ex = n.extras
         // Gravador de tela/voz: o Notch não grava nada, só mostra o tempo da gravação do outro app.
         val text = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)}".lowercase()
         if (s.recorderEnabled && (recorderWords.any { it in text } || "recorder" in pkg || "screenrecord" in pkg)) return LiveKind.Recording
-        if (!s.liveEnabled) return null
+        // Tela sendo transmitida ou compartilhada (o Notch só mostra o aviso que o sistema já dá).
+        if (s.shareEnabled && castWords.any { it in text }) return LiveKind.Cast
+        // Arquivo indo ou vindo pelo Quick Share.
+        if (s.shareEnabled && hasBar && (pkg in shareApps || shareWords.any { it in text }) && (pkg !in gmsApps || shareWords.any { it in text })) return LiveKind.Share
         if (pkg in deliveryApps) return null // pedidos: acompanhados à parte (Orders)
-        if (pkg in tripApps) return LiveKind.Trip
-        if (pkg in fitnessApps) return LiveKind.Workout
+        if (s.activitiesEnabled) {
+            if (pkg in tripApps) return LiveKind.Trip
+            // Treino: pelo app ou pela categoria que o próprio app informa ao Android.
+            if (pkg in fitnessApps || n.category == CATEGORY_WORKOUT) return LiveKind.Workout
+        }
         val chrono = ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val words = "${ex.getCharSequence(Notification.EXTRA_TITLE)} ${ex.getCharSequence(Notification.EXTRA_TEXT)} ${n.channelIdSafe()}".lowercase()
         val isStopwatch = listOf("cronômetro", "cronometro", "stopwatch").any { it in words }
         val isTimer = listOf("timer", "temporizador").any { it in words }
-        return when {
+        val clockKind = when {
             chrono && Build.VERSION.SDK_INT >= 24 && ex.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) -> LiveKind.Timer
+            n.category == CATEGORY_STOPWATCH && chrono -> LiveKind.Stopwatch
             clockApp && isStopwatch -> LiveKind.Stopwatch
             clockApp && isTimer -> LiveKind.Timer
             clockApp && chrono -> LiveKind.Stopwatch
+            else -> null
+        }
+        if (clockKind != null) return if (s.liveEnabled) clockKind else null
+        if (!s.activitiesEnabled) return null
+        return when {
             // Download, envio ou instalação com barra de progresso.
             !clockApp && ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0 && !ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) -> LiveKind.Progress
             // Fase sem porcentagem (preparando, verificando, instalando): continua na ilha, com o anel girando.
             !clockApp && ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) &&
                 (sbn.key == lastProgress?.key || progressWords.any { it in words }) -> LiveKind.Progress
             else -> null
+        }
+    }
+
+    /** Uma linha por notificação: de qual app é e como o Notch a leu (para descobrir por que algo não aparece). */
+    private fun report(): String {
+        val list = runCatching { activeNotifications }.getOrNull().orEmpty().filterNot { Banks.isBank(it.packageName) }
+        if (list.isEmpty()) return "Nenhuma notificação agora."
+        return list.sortedByDescending { it.postTime }.joinToString("\n\n") { sbn ->
+            val n = sbn.notification
+            val ex = n.extras
+            val read = when {
+                sbn.packageName == packageName -> "do próprio Notch"
+                isCall(sbn) -> "chamada"
+                sbn.packageName in deliveryApps -> "pedido: " + (Orders.parse(sbn).step?.label ?: "sem etapa reconhecida")
+                sbn.packageName in parcelApps && Parcels.parse(sbn).step != null -> "encomenda: " + Parcels.parse(sbn).step?.label
+                liveKind(sbn) != null -> "ao vivo: ${liveKind(sbn)}"
+                isRegular(sbn) -> "notificação comum"
+                else -> "ignorada"
+            }
+            val bar = if (ex.getInt(Notification.EXTRA_PROGRESS_MAX, 0) > 0 || ex.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE)) " · barra" else ""
+            val chrono = if (ex.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)) " · cronômetro" else ""
+            val layout = if (n.contentView != null || n.bigContentView != null) " · layout próprio" else ""
+            "${appLabel(this, sbn.packageName)} (${sbn.packageName})\n" +
+                "→ $read\n" +
+                "categoria ${n.category ?: "-"} · canal ${n.channelIdSafe().ifBlank { "-" }} · ${if (sbn.isOngoing) "contínua" else "comum"}$bar$chrono$layout\n" +
+                "\"${ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().take(50)}\" / \"${ex.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty().take(70)}\""
         }
     }
 
@@ -182,7 +224,7 @@ class NotifListener : NotificationListenerService() {
 
     /** Lê o status do pedido de cada notificação do app de comida; true se era um status de pedido. */
     private fun trackOrder(sbn: StatusBarNotification): Boolean {
-        if (sbn.packageName !in deliveryApps || !Prefs.state.value.liveEnabled) return false
+        if (sbn.packageName !in deliveryApps || !Prefs.state.value.activitiesEnabled) return false
         val u = Orders.parse(sbn)
         val prev = order?.takeIf { System.currentTimeMillis() - orderAt < 3 * 3600_000L }
         val step = u.step ?: if (prev != null && u.eta.isNotBlank()) prev.orderStep() else return false
@@ -213,6 +255,40 @@ class NotifListener : NotificationListenerService() {
         return o
     }
 
+    // ---------- encomenda (lojas e rastreio) ----------
+
+    private var parcel: LiveInfo? = null
+    private var parcelAt = 0L
+
+    /** Lê o status da encomenda da notificação da loja; true se era um status de encomenda. */
+    private fun trackParcel(sbn: StatusBarNotification): Boolean {
+        if (sbn.packageName !in parcelApps || !Prefs.state.value.parcelEnabled) return false
+        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return false
+        val u = Parcels.parse(sbn)
+        val step = u.step ?: return false
+        val n = sbn.notification
+        parcel = LiveInfo(
+            key = "encomenda-${sbn.packageName}-${step.ordinal}-${sbn.id}", pkg = sbn.packageName, kind = LiveKind.Parcel,
+            title = u.title, text = u.text, icon = null, chronoBase = 0, countDown = false,
+            contentIntent = n.contentIntent, actions = emptyList(),
+            appName = appLabel(this, sbn.packageName), smallIcon = n.smallIcon, color = n.color,
+            step = step.ordinal, eta = u.eta,
+        )
+        parcelAt = System.currentTimeMillis()
+        return true
+    }
+
+    /** A encomenda fica na ilha por um tempo depois de cada status (mais quando saiu para entrega). */
+    private fun currentParcel(): LiveInfo? {
+        val p = parcel ?: return null
+        val age = System.currentTimeMillis() - parcelAt
+        val limit = Parcels.showFor(p.parcelStep())
+        if (age > limit) { parcel = null; return null }
+        handler.removeCallbacks(expireOrder)
+        handler.postDelayed(expireOrder, limit - age + 500)
+        return p
+    }
+
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val expireOrder = Runnable { refresh() }
 
@@ -226,7 +302,7 @@ class NotifListener : NotificationListenerService() {
      */
     private fun watchDone(now: LiveInfo?) {
         val prev = lastProgress
-        val cur = now?.takeIf { it.kind == LiveKind.Progress && it.progress < 1f }
+        val cur = now?.takeIf { (it.kind == LiveKind.Progress || it.kind == LiveKind.Share) && it.progress < 1f }
         if (cur != null && cur.key != prev?.key) maxSeen = 0f
         if (cur != null) maxSeen = maxOf(maxSeen, cur.progress)
         lastProgress = cur
@@ -290,7 +366,7 @@ class NotifListener : NotificationListenerService() {
                 (kind == LiveKind.Timer || kind == LiveKind.Stopwatch) && customChrono != null -> customChrono.first
                 // Sem cronômetro do sistema: sincroniza pelo tempo escrito na notificação
                 // (o gravador atualiza o texto) e conta sozinho entre uma atualização e outra.
-                kind == LiveKind.Recording || kind == LiveKind.Stopwatch ->
+                kind == LiveKind.Recording || kind == LiveKind.Stopwatch || kind == LiveKind.Cast ->
                     // Cada atualização chega igual ou atrasada, nunca adiantada: o menor valor é o início real.
                     // O "when" da notificação, quando o app coloca a hora de início (bem antes da postagem),
                     // é o início verdadeiro; o texto do gravador às vezes anda 1 s atrás dele.
@@ -299,7 +375,7 @@ class NotifListener : NotificationListenerService() {
                         val fromText = parseElapsed("$title $text")?.let { sbn.postTime - it }
                         val guess = listOfNotNull(explicitWhen, fromText).minOrNull()
                         if (guess == null) {
-                            if (kind == LiveKind.Recording) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
+                            if (kind == LiveKind.Recording || kind == LiveKind.Cast) firstSeen.getOrPut(sbn.key) { sbn.postTime } else 0L
                         } else {
                             val best = minOf(textBase[sbn.key] ?: guess, guess)
                             textBase[sbn.key] = best
@@ -484,7 +560,24 @@ class NotifListener : NotificationListenerService() {
     }
 }
 
-private val recorderWords = listOf("gravando", "gravação de tela", "gravacao de tela", "recording", "screen record")
+private val recorderWords = listOf("gravando", "gravação de tela", "gravacao de tela", "gravação em andamento", "gravacao em andamento", "recording", "screen record")
+
+/** Categorias que o próprio app informa ao Android (existem desde o Android 12). */
+private const val CATEGORY_WORKOUT = "workout"
+private const val CATEGORY_STOPWATCH = "stopwatch"
+
+private val castWords = listOf(
+    "transmitindo", "transmissão de tela", "transmissao de tela", "espelhando", "espelhamento de tela", "compartilhando a tela",
+    "compartilhando sua tela", "compartilhando a sua tela", "casting", "screen cast", "sharing your screen", "screen mirroring",
+)
+
+/** Quick Share: o do Google mora dentro do Google Play Services, que também manda outros avisos. */
+private val gmsApps = setOf("com.google.android.gms")
+private val shareApps = setOf("com.google.android.gms", "com.google.android.apps.nearby.sharing", "com.samsung.android.app.sharelive", "com.samsung.android.aware.service")
+private val shareWords = listOf(
+    "quick share", "compartilhar por proximidade", "compartilhamento por proximidade", "nearby share",
+    "enviando para", "recebendo de", "sending to", "receiving from",
+)
 
 /** Reuniões de vídeo: a notificação contínua da reunião vira uma chamada de vídeo na ilha. */
 private val meetApps = setOf(
@@ -494,15 +587,20 @@ private val meetApps = setOf(
 /** Treino em andamento (Google Fit, Strava, Samsung Health, Nike Run). */
 private val fitnessApps = setOf(
     "com.google.android.apps.fitness", "com.strava", "com.sec.android.app.shealth", "com.nike.plusgps",
+    "com.runtastic.android", "com.garmin.android.apps.connectmobile", "com.fitbit.FitbitMobile", "com.mi.health",
+    "com.xiaomi.wearable", "com.huami.watch.hmwatchmanager", "cc.pacer.androidapp", "com.fitnesskeeper.runkeeper.pro",
 )
 
 /** Corridas e entregas: a notificação contínua vira atividade ao vivo. */
 private val tripApps = setOf(
     "com.ubercab", "com.ubercab.eats", "com.taxis99", "br.com.brainweb.ifood", "com.grability.rappi",
-    "com.cabify.rider", "com.indriver", "sinet.startup.inDriver", "com.mercadolibre", "com.shopee.br",
+    "com.cabify.rider", "com.indriver", "sinet.startup.inDriver", "com.ubercab.uberlite", "com.lalamove.huolala.client",
 )
 
-private val navApps = setOf("com.google.android.apps.maps", "com.waze", "com.here.app.maps", "com.sygic.aura", "ru.yandex.yandexnavi")
+private val navApps = setOf(
+    "com.google.android.apps.maps", "com.google.android.apps.mapslite", "com.waze", "com.here.app.maps", "com.sygic.aura",
+    "ru.yandex.yandexnavi", "net.osmand", "net.osmand.plus", "app.organicmaps", "com.mapswithme.maps.pro", "com.tomtom.gplay.navapp",
+)
 
 fun appLabel(ctx: Context, pkg: String): String = runCatching {
     val pm = ctx.packageManager

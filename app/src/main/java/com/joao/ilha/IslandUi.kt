@@ -148,7 +148,7 @@ private enum class Mode(val large: Boolean) {
     ExpandedCall(true), ExpandedMedia(true), ExpandedList(true), ExpandedBattery(true), ExpandedClock(true), ExpandedSystem(true),
     Reminder(true), ExpandedHealth(true), ExpandedBreathe(true),
     Live(false), AlarmRinging(true), ExpandedLive(true),
-    Volume(false), ExpandedControls(true), Status(false), Done(true), ExpandedHome(true), Intro(true), Wallet(true),
+    Volume(false), ExpandedControls(true), Status(false), Done(true), ExpandedHome(true), Intro(true),
 }
 
 @Composable
@@ -211,7 +211,6 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         popup is Popup.Status -> Mode.Status
         popup is Popup.Done -> Mode.Done
         popup is Popup.Intro -> Mode.Intro
-        popup is Popup.Wallet -> Mode.Wallet
         main == Act.Call -> Mode.Call
         main == Act.Live -> Mode.Live
         main == Act.Media -> Mode.Media
@@ -269,22 +268,21 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
         // Desbloqueio fica do tamanho normal da ilha; os outros avisos têm texto e crescem.
         Mode.Status -> if ((popup as? Popup.Status)?.kind == StatusKind.Unlocked) sizeFor(Mode.Idle) else (baseW + grow + 96.dp to baseH)
         Mode.Done -> wide to 70.dp * k * t
-        Mode.Wallet -> wide to 88.dp * k * t
         // A animação NOTCH tem o formato do vídeo (240×136 pontos); a do cavalo é mais baixa.
         Mode.Intro -> if ((popup as? Popup.Intro)?.horse == true) wide to 132.dp * k else wide to wide * (136f / 240f)
         Mode.ExpandedHome -> wide to homeHeight(s, weatherNow, agendaNow) * t
         Mode.ExpandedControls -> wide to controlsHeight(s.controlsApps.isNotEmpty()) * k
         Mode.Live -> baseW + grow + when (live?.kind) {
-            LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery -> 64.dp
+            LiveKind.Navigation, LiveKind.Trip, LiveKind.Workout, LiveKind.Delivery, LiveKind.Parcel -> 64.dp
             LiveKind.Recording -> 44.dp
             else -> 28.dp
         } to baseH
         Mode.AlarmRinging -> wide to (if (live?.actions.isNullOrEmpty()) 70.dp else 104.dp) * k * t
         Mode.ExpandedLive -> wide to live.let { l ->
             when {
-                l?.kind == LiveKind.Delivery -> if (l.title.isNotBlank()) 212.dp else 186.dp
-                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> if (l?.kind == LiveKind.Progress) 78.dp else 92.dp
-                l.kind == LiveKind.Progress -> 78.dp
+                l?.kind == LiveKind.Delivery || l?.kind == LiveKind.Parcel -> if (l?.title?.isNotBlank() == true) 212.dp else 186.dp
+                l?.kind == LiveKind.Progress || l?.kind == LiveKind.Share -> 78.dp
+                l == null || l.actions.isEmpty() && l.kind != LiveKind.Trip && l.kind != LiveKind.Workout -> 92.dp
                 l.kind == LiveKind.Trip -> if (l.actions.isEmpty()) 128.dp else 168.dp
                 l.kind == LiveKind.Workout -> if (l.actions.isEmpty()) 104.dp else 150.dp
                 // Botões redondos ficam ao lado do tempo, na mesma linha.
@@ -469,7 +467,6 @@ fun IslandUi(state: IslandUiState, actions: IslandActions) {
                         Mode.Volume -> (popup as? Popup.Volume)?.let { VolumePopup(it.level, it.max, it.ring, baseH) }
                         Mode.Status -> (popup as? Popup.Status)?.let { StatusPopup(it.kind, baseH) }
                         Mode.Done -> (popup as? Popup.Done)?.let { DoneBanner(it) }
-                        Mode.Wallet -> (popup as? Popup.Wallet)?.let { WalletPayBanner(it.pay) }
                         Mode.Intro -> if ((popup as? Popup.Intro)?.horse == true) IntroScene() else NotchIntroScene()
                         Mode.ExpandedHome -> HomeCard(s, notifs.size, actions)
                         Mode.ExpandedControls -> ControlsCard(s, actions)

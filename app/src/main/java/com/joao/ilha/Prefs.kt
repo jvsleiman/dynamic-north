@@ -148,6 +148,15 @@ data class Settings(
 
     // Ao vivo
     val liveEnabled: Boolean = true,
+    /** Pedidos de comida, corridas, treinos e downloads. */
+    val activitiesEnabled: Boolean = true,
+    /** Encomendas (lojas e rastreio). */
+    val parcelEnabled: Boolean = true,
+    /** Transmissão de tela, Quick Share e roteador Wi‑Fi. */
+    val shareEnabled: Boolean = true,
+    /** Foco (Pomodoro): minutos de foco e de pausa. */
+    val focusMinutes: Int = 25,
+    val focusBreakMinutes: Int = 5,
     val navEnabled: Boolean = true,
     val alarmEnabled: Boolean = true,
     val privacyDot: Boolean = true,

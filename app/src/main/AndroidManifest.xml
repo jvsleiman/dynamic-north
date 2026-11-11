@@ -80,6 +80,9 @@
             </intent-filter>
         </service>
 
+        <!-- Botões do Foco na ilha (pausar, pular, parar). -->
+        <receiver android:name=".FocusReceiver" android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

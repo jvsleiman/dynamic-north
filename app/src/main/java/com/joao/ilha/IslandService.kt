@@ -84,6 +84,7 @@ class IslandService : AccessibilityService() {
     private var pending: Pair<Popup, Long>? = null
 
     private var lastDnd = false
+    private var lastHotspot: Boolean? = null
     private var lastDndChange = 0L
     private var lastNavTitle: String? = null
     private var lastLiveKey: String? = null
@@ -120,6 +121,16 @@ class IslandService : AccessibilityService() {
                     }
                     // O Não perturbe também muda o modo da campainha; não mostra os dois avisos juntos.
                     if (System.currentTimeMillis() - lastDndChange > 1500) show(Popup.Status(kind), haptic = false)
+                }
+                // Roteador Wi‑Fi (hotspot) ligado ou desligado. 13 = ligado, 11 = desligado.
+                ACTION_HOTSPOT -> {
+                    val on = when (i.getIntExtra("wifi_state", -1)) { 13 -> true; 11 -> false; else -> return }
+                    val changed = lastHotspot != on
+                    lastHotspot = on
+                    // O Android reenvia o estado atual quando o serviço liga: só avisa quando muda de verdade.
+                    if (changed && !isInitialStickyBroadcast && s.statusAlerts && s.shareEnabled) {
+                        show(Popup.Status(if (on) StatusKind.HotspotOn else StatusKind.HotspotOff), haptic = false)
+                    }
                 }
                 android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> if (s.statusAlerts) {
                     val on = dndActive()
@@ -188,6 +199,7 @@ class IslandService : AccessibilityService() {
             addAction(ACTION_HEADSET_STATE)
             addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
             addAction(android.app.NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+            addAction(ACTION_HOTSPOT)
         }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(receiver, filter, RECEIVER_EXPORTED) else registerReceiver(receiver, filter)
         addOverlay()
@@ -501,7 +513,7 @@ class IslandService : AccessibilityService() {
         if (!test && Banks.isBank(foregroundPkg.value)) return
         if (ui.expanded.value && !test) {
             // Com a ilha aberta o aviso espera e aparece quando ela fechar (não se perde).
-            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done || p is Popup.Wallet) pending = p to System.currentTimeMillis()
+            if (p is Popup.Notification || p is Popup.Bluetooth || p is Popup.Charging || p is Popup.Done) pending = p to System.currentTimeMillis()
             return
         }
         if (test) ui.expanded.value = false
@@ -514,7 +526,7 @@ class IslandService : AccessibilityService() {
         if (p is Popup.Notification && s.keepUntilRead) return
         // Com botões, o aviso fica um pouco mais para dar tempo de tocar.
         val extra = if (p is Popup.Notification && s.showNotifActions && p.item.actions.isNotEmpty()) 3000L else 0L
-        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Wallet) Wallet.SHOW_MS else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
+        val duration = if (p is Popup.Intro) (if (p.horse) INTRO_MS else NOTCH_INTRO_MS) else if (p is Popup.Volume) 1_600L else if (p is Popup.Status) 1_800L else s.popupSeconds * 1000L + extra
         popupJob = scope.launch {
             delay(duration)
             ui.popup.value = null
@@ -889,6 +901,7 @@ class IslandService : AccessibilityService() {
         // Bateria de fones: broadcast do sistema que existe na maioria dos aparelhos, mas não é API pública.
         // Mudança de volume: broadcast do sistema, não é API pública, mas existe nos aparelhos comuns.
         private const val ACTION_VOLUME = "android.media.VOLUME_CHANGED_ACTION"
+        private const val ACTION_HOTSPOT = "android.net.wifi.WIFI_AP_STATE_CHANGED"
         private const val ACTION_BT_BATTERY = "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
         private const val ACTION_A2DP_STATE = "android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED"
         private const val ACTION_HEADSET_STATE = "android.bluetooth.headset.profile.action.CONNECTION_STATE_CHANGED"

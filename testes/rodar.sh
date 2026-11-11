@@ -77,7 +77,20 @@ log "== Pedido de comida (etapas) =="
 caso limpar; sleep 1
 for i in 1 2 3 4 5; do caso pedido; sleep 1.2; shot "pedido-aberto-$i"; sleep 3; shot "pedido-pequeno-$i"; done
 caso limpar; sleep 1
-caso carteira; sleep 0.3; shot "carteira-1"; sleep 0.5; shot "carteira-2"; sleep 0.9; shot "carteira-3"; sleep 1.5; shot "carteira-4"; sleep 1.5; caso limpar; sleep 1
+log "== Telas novas: encomenda, foco, transmissão, Quick Share, roteador =="
+# O timer do relógio do teste anterior continuaria na ilha: encerra o app Relógio.
+adb shell am force-stop com.google.android.deskclock; sleep 1
+for i in 1 2 3 4; do caso encomenda; sleep 1.2; shot "encomenda-aberta-$i"; sleep 3; shot "encomenda-pequena-$i"; done
+caso limpar; sleep 1
+caso foco; sleep 1.2; shot "foco-aberto"; sleep 3; shot "foco-pequeno"
+caso atividade; sleep 1.5; shot "foco-botoes"; caso foco-pausar; sleep 1; shot "foco-pausado"; fechar
+caso limpar; sleep 1
+caso transmissao; sleep 1.2; shot "transmissao-aberta"; sleep 3; shot "transmissao-pequena"
+caso limpar; sleep 1
+caso quickshare; sleep 1.2; shot "quickshare-aberto"; sleep 3; shot "quickshare-pequeno"; sleep 3; shot "quickshare-concluido"; sleep 3
+caso limpar; sleep 1
+caso roteador; sleep 0.8; shot "roteador"; sleep 2
+caso limpar; sleep 1
 caso musica; sleep 1; caso atividade; sleep 1.5; shot "musica-aberta"; fechar
 caso limpar; sleep 1
 caso principal; sleep 1.5; shot "ilha-principal"
