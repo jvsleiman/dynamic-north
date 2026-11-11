@@ -721,7 +721,7 @@ class IslandService : AccessibilityService() {
         }
         val popup = ui.popup.value
         if (tap && popup is Popup.Notification) {
-            runCatching { popup.item.contentIntent?.send() }
+            runCatching { popup.item.contentIntent?.launch() }
             ui.popup.value = null
             return
         }
@@ -750,7 +750,7 @@ class IslandService : AccessibilityService() {
             Gesture.OpenApp -> {
                 val live = IslandBus.live.value
                 if (IslandBus.call.value == null && live?.contentIntent != null && popup == null) {
-                    runCatching { live.contentIntent.send() }
+                    runCatching { live.contentIntent.launch() }
                     collapse()
                     return
                 }
@@ -798,7 +798,7 @@ class IslandService : AccessibilityService() {
             val i = Intent(this, ReplyActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
             runCatching { startActivity(i) }
         } else {
-            runCatching { action.intent.send() }
+            runCatching { action.intent.launch() }
         }
         collapse()
     }

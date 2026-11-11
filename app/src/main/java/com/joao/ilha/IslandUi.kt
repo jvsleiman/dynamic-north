@@ -863,7 +863,7 @@ private fun NotificationBanner(n: NotifItem, showActions: Boolean, thread: Boole
                         Modifier
                             .fillMaxWidth()
                             .height(ThreadRow)
-                            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.send() }; actions.onThread(false) } },
+                            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.launch() }; actions.onThread(false) } },
                         verticalArrangement = Arrangement.Center,
                     ) {
                         if (group && m.sender.isNotBlank()) Text(m.sender, color = col.dim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -939,9 +939,9 @@ private fun IncomingCall(c: CallInfo) {
             Text("Chamada recebida", color = col.dim, fontSize = 12.sp)
             Text(c.name, color = col.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        RoundButton(Icons.Rounded.CallEnd, Red, 46.dp) { runCatching { c.decline?.send() } }
+        RoundButton(Icons.Rounded.CallEnd, Red, 46.dp) { runCatching { c.decline?.launch() } }
         Spacer(Modifier.width(12.dp))
-        RoundButton(Icons.Rounded.Call, Green, 46.dp) { runCatching { (c.answer ?: c.contentIntent)?.send() } }
+        RoundButton(Icons.Rounded.Call, Green, 46.dp) { runCatching { (c.answer ?: c.contentIntent)?.launch() } }
     }
 }
 
@@ -965,13 +965,13 @@ private fun ExpandedVideoCall(c: CallInfo, actions: IslandActions) {
                     val end = mapped?.first == Icons.Rounded.CallEnd
                     if (mapped != null) {
                         RoundButton(mapped.first, if (end) Red else Color(0xFF3A3A3C), 42.dp) {
-                            runCatching { a.intent.send() }
+                            runCatching { a.intent.launch() }
                             if (end) actions.onCollapse()
                         }
                     } else {
                         Box(
                             Modifier.height(42.dp).clip(RoundedCornerShape(21.dp)).background(Color(0xFF3A3A3C))
-                                .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                                .pointerInput(a) { detectTapGestures { runCatching { a.intent.launch() } } }
                                 .padding(horizontal = 12.dp),
                             contentAlignment = Alignment.Center,
                         ) { Text(a.title, color = Color.White, fontSize = 12.sp, maxLines = 1) }
@@ -992,7 +992,7 @@ private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
     val col = LocalIslandColors.current
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.pointerInput(c.key) { detectTapGestures { runCatching { c.contentIntent?.send() }; actions.onCollapse() } }) {
+            Box(Modifier.pointerInput(c.key) { detectTapGestures { runCatching { c.contentIntent?.launch() }; actions.onCollapse() } }) {
                 Avatar(c.photo, 48.dp)
             }
             Spacer(Modifier.width(12.dp))
@@ -1010,20 +1010,20 @@ private fun ExpandedCall(c: CallInfo, actions: IslandActions) {
         val buttons = c.actions.filter { it.intent != c.answer }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             if (buttons.isEmpty()) {
-                RoundButton(Icons.Rounded.Call, Color(0xFF3A3A3C), 48.dp) { runCatching { c.contentIntent?.send() }; actions.onCollapse() }
-                RoundButton(Icons.Rounded.CallEnd, Red, 48.dp) { runCatching { c.decline?.send() }; actions.onCollapse() }
+                RoundButton(Icons.Rounded.Call, Color(0xFF3A3A3C), 48.dp) { runCatching { c.contentIntent?.launch() }; actions.onCollapse() }
+                RoundButton(Icons.Rounded.CallEnd, Red, 48.dp) { runCatching { c.decline?.launch() }; actions.onCollapse() }
             } else buttons.forEach { a ->
                 val mapped = actionIcon(a.title)
                 val end = mapped?.first == Icons.Rounded.CallEnd || a.intent == c.decline
                 if (mapped != null || end) {
                     RoundButton(if (end) Icons.Rounded.CallEnd else mapped!!.first, if (end) Red else Color(0xFF3A3A3C), 48.dp) {
-                        runCatching { a.intent.send() }
+                        runCatching { a.intent.launch() }
                         if (end) actions.onCollapse()
                     }
                 } else {
                     Box(
                         Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(Color(0xFF3A3A3C))
-                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.launch() } } }
                             .padding(horizontal = 14.dp),
                         contentAlignment = Alignment.Center,
                     ) { Text(a.title, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -1296,7 +1296,7 @@ private fun SwipeRow(n: NotifItem, ic: Float, actions: IslandActions) {
             .height(ListRow * LocalDensity.current.fontScale)
             .offset { IntOffset(shown.toInt(), 0) }
             .alpha((1f - abs(shown) / 600f).coerceIn(0.2f, 1f))
-            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.send() }; actions.onCollapse() } }
+            .pointerInput(n.key) { detectTapGestures { runCatching { n.contentIntent?.launch() }; actions.onCollapse() } }
             .pointerInput(n.key) {
                 detectHorizontalDragGestures(
                     onDragEnd = {

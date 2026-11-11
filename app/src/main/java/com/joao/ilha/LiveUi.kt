@@ -290,7 +290,7 @@ private fun ExpandedWorkout(l: LiveInfo) {
                     val strong = mapped?.second == true
                     Box(
                         Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(if (strong) l.tint() else col.text.copy(alpha = 0.16f))
-                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } }
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.launch() } } }
                             .padding(horizontal = if (mapped != null && !strong) 10.dp else 18.dp),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -354,7 +354,7 @@ private fun ExpandedTimer(l: LiveInfo) {
                     val bg = if (strong) l.tint().copy(alpha = 0.3f) else col.text.copy(alpha = 0.16f)
                     Box(
                         Modifier.size(46.dp).clip(CircleShape).background(bg)
-                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } },
+                            .pointerInput(a) { detectTapGestures { runCatching { a.intent.launch() } } },
                         contentAlignment = Alignment.Center,
                     ) { Icon(icon, a.title, tint = if (strong) l.tint() else col.text, modifier = Modifier.size(24.dp)) }
                     Spacer(Modifier.width(10.dp))
@@ -486,7 +486,7 @@ private fun LiveActions(l: LiveInfo) {
                     .height(34.dp)
                     .clip(RoundedCornerShape(17.dp))
                     .background(if (strong) l.tint().copy(alpha = 0.85f) else col.text.copy(alpha = 0.14f))
-                    .pointerInput(a) { detectTapGestures { runCatching { a.intent.send() } } },
+                    .pointerInput(a) { detectTapGestures { runCatching { a.intent.launch() } } },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(a.title, color = if (strong) Color.White else col.text, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
