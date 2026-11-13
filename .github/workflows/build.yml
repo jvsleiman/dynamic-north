@@ -48,6 +48,8 @@ jobs:
       # Com os segredos KEYSTORE_BASE64 e KEYSTORE_PASSWORD cadastrados no repositório, o APK é assinado
       # e publicado no branch `releases` (lido pelo botão Atualizar). Sem eles, este passo só avisa.
       - name: Assinar e publicar no branch releases
+        # Se a chave cadastrada estiver errada, avisa mas não impede o APK de ir para o branch builds.
+        continue-on-error: true
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -69,7 +71,10 @@ jobs:
           fi
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           SIGNER="$ANDROID_HOME/build-tools/$BT/apksigner"
-          echo "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > "$RUNNER_TEMP/ilha.jks"
+          if ! echo "$KEYSTORE_BASE64" | tr -d ' \r\n\t' | base64 -d > "$RUNNER_TEMP/ilha.jks" 2>/dev/null; then
+            echo "::error::O segredo KEYSTORE_BASE64 não é um base64 válido. Cole de novo o conteúdo inteiro do arquivo ilha-release.jks.base64.txt (uma linha só, sem aspas)."
+            exit 1
+          fi
           "$SIGNER" sign --ks "$RUNNER_TEMP/ilha.jks" --ks-key-alias ilha \
             --ks-pass env:KEYSTORE_PASSWORD --key-pass env:KEYSTORE_PASSWORD \
             --out "$RUNNER_TEMP/Ilha.apk" out/Ilha-unsigned.apk

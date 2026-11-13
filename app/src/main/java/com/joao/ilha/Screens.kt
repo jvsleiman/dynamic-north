@@ -121,7 +121,7 @@ fun HomeScreen(go: (Screen) -> Unit) {
         }
     }
     Page("Notch", onBack = null) {
-        IslandPreview(s)
+        HomeHero(s)
         if (!a11y || !listener) {
             Group(
                 "Permissões",
