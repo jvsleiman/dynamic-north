@@ -118,3 +118,4 @@ if grep -q "$PKG" $OUT/travamentos.txt; then log "TRAVOU: veja travamentos.txt";
 # animação NOTCH: 926 quadros
 # pedido: altura da ilha aberta
 # 1.0.5
+# 1.0.9
