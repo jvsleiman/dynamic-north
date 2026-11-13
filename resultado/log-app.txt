@@ -1,0 +1,71 @@
+11-13 21:10:02.630   486  2230 I ConditionProviders:  Allowing condition provider com.joao.ilha/com.joao.ilha.NotifListener (userSet: true)
+11-13 21:10:02.630   486  2230 I NotificationListeners:  Allowing notification listener com.joao.ilha/com.joao.ilha.NotifListener (userSet: true)
+11-13 21:10:02.630   486  2230 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:02.630   486  2230 V NotificationListeners: binding: Intent { act=android.service.notification.NotificationListenerService cmp=com.joao.ilha/.NotifListener (has extras) }
+11-13 21:10:03.377   486   522 I ActivityManager: Start proc 2870:com.joao.ilha/u0a174 for service {com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:03.653   486   486 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:03.653   486   486 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-13 21:10:04.954   486  1670 W BackupTransportManager: Package com.joao.ilha enabled setting: 0
+11-13 21:10:06.108   486   486 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:06.108   486   486 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-13 21:10:08.323   486   486 V NotificationListeners: 0 notification listener service connected: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:09.225   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{d00a2d6 com.google.android.as/10117} BLOCKED
+11-13 21:10:09.850   486   486 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:10:09.866   486   486 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-13 21:10:18.294   486  2130 D CoreBackPreview: Window{8465fdc u0 com.joao.ilha}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d977e6b, mPriority=0}
+11-13 21:10:18.351   486  2230 D CoreBackPreview: Window{877f7d3 u0 com.joao.ilha}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@e219141, mPriority=0}
+11-13 21:10:19.149   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{776423c com.google.android.partnersetup/10104} BLOCKED
+11-13 21:10:19.152   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{92d591a com.android.remoteprovisioner/10151} BLOCKED
+11-13 21:10:20.788   486  2487 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{d00a2d6 com.google.android.as/10117} BLOCKED
+11-13 21:10:29.259   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{22d14ba com.google.android.settings.intelligence/10107} BLOCKED
+11-13 21:11:02.610   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{fe31669 com.google.android.as/10117} BLOCKED
+11-13 21:11:02.619   486   486 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:11:02.620   486   486 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-13 21:11:09.549   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{cea7a5c com.google.android.as/10117} BLOCKED
+11-13 21:11:09.550   486   486 V NotificationListeners: enabling notification listener for 0: ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener}
+11-13 21:11:09.550   486   486 V NotificationListeners: Not registering ComponentInfo{com.joao.ilha/com.joao.ilha.NotifListener} is already bound
+11-13 21:11:11.597   486   841 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{17c4f61 com.google.android.settings.intelligence/10107} BLOCKED
+11-13 21:11:11.600   486  2230 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{8238a86 com.google.android.settings.intelligence/10107} BLOCKED
+11-13 21:11:21.967   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{51d62ef com.android.remoteprovisioner/10151} BLOCKED
+11-13 21:11:28.436   486   751 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{11dde8 com.google.android.settings.intelligence/10107} BLOCKED
+11-13 21:11:29.886   486   544 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{5f942b6 com.google.android.setupwizard/10116} BLOCKED
+11-13 21:11:49.589   764   764 E AndroidRuntime: FATAL EXCEPTION: main
+11-13 21:11:49.589   764   764 E AndroidRuntime: Process: com.android.systemui, PID: 764
+11-13 21:11:49.589   764   764 E AndroidRuntime: java.lang.IllegalArgumentException: Unknown authority com.google.android.flipendo.api
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.content.ContentResolver.call(ContentResolver.java:2447)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at com.google.android.systemui.power.PowerNotificationWarningsGoogleImpl$1.onReceive(PowerNotificationWarningsGoogleImpl.java:958)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at com.android.systemui.broadcast.ActionReceiver$onReceive$1$1$1.run(ActionReceiver.kt:21)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.os.Handler.handleCallback(Handler.java:942)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.os.Looper.loopOnce(Looper.java:201)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.os.Looper.loop(Looper.java:288)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at android.app.ActivityThread.main(ActivityThread.java:7924)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at java.lang.reflect.Method.invoke(Native Method)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:548)
+11-13 21:11:49.589   764   764 E AndroidRuntime: 	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:936)
+11-13 21:11:52.882   486  2487 I AppsFilter: interaction: PackageSetting{3d856f1 com.joao.ilha/10174} -> PackageSetting{e1c2dac com.google.android.apps.nexuslauncher/10152} BLOCKED
+11-13 21:12:43.019   486  2486 I MediaSessionStack: addSession to bottom of stack | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:12:43.032   486  2478 I MediaSessionStack: onPlaybackStateChanged - Pushing session to top | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:12:46.693   486  2077 I MediaSessionStack: removeSession | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:15:11.129  2870  2901 I com.joao.ilha: Compiler allocated 4438KB to compile void com.joao.ilha.IslandUiKt.IdleContent-6a0pyJM(com.joao.ilha.IdleStyle, java.util.List, float, boolean, androidx.compose.runtime.Composer, int)
+11-13 21:15:18.912  7488  7488 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-13 21:15:43.754   486   576 I MediaSessionStack: addSession to bottom of stack | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:15:43.813   486   576 I MediaSessionStack: onPlaybackStateChanged - Pushing session to top | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:15:43.854   962   962 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-13 21:15:43.854   962   962 D MediaPlayerList: Already have a controller for the player: com.joao.ilha, updating instead
+11-13 21:15:43.856   962   962 D MediaPlayerList: onActiveSessionsChanged: controller: com.joao.ilha
+11-13 21:15:43.857   962   962 D MediaPlayerList: Already have a controller for the player: com.joao.ilha, updating instead
+11-13 21:15:48.682   486   576 I MediaSessionStack: removeSession | record: com.joao.ilha/notch-teste (userId=0)
+11-13 21:16:00.499  2870  2902 I com.joao.ilha: Background young concurrent copying GC freed 56350(2944KB) AllocSpace objects, 1(24KB) LOS objects, 33% free, 5431KB/8182KB, paused 28us,9us total 310.115ms
+11-13 21:16:34.575  7691  7713 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-13 21:16:42.820  7768  7768 I AndroidRuntime: VM exiting with result code 0, cleanup skipped.
+11-13 21:17:03.786  2870  2902 I com.joao.ilha: Background young concurrent copying GC freed 77716(3796KB) AllocSpace objects, 0(0B) LOS objects, 43% free, 5087KB/9011KB, paused 5.834ms,9us total 32.662ms
+11-13 21:17:47.462   486   868 I ActivityTaskManager: START u0 {flg=0x10008000 cmp=com.joao.ilha/.MainActivity} from uid 2000
+11-13 21:17:47.740   486  1771 D CoreBackPreview: Window{cb1211f u0 Splash Screen com.joao.ilha}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@b656ca, mPriority=0}
+11-13 21:17:48.476   486  1771 D CoreBackPreview: Window{521022a u0 com.joao.ilha/com.joao.ilha.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@98deaf7, mPriority=0}
+11-13 21:17:49.208   486   508 W ziparchive: Unable to open '/data/app/~~QsTm4imPK5T1ynkVcS5apw==/com.joao.ilha-0YmngMEK8uur8KI_yOdGUw==/base.dm': No such file or directory
+11-13 21:17:49.312   486   508 I ActivityTaskManager: Displayed com.joao.ilha/.MainActivity: +1s741ms
+11-13 21:17:49.571  1493  1493 I GoogleInputMethodService: GoogleInputMethodService.onStartInput():1877 onStartInput(EditorInfo{inputType=0x0(NULL) imeOptions=0x0 privateImeOptions=null actionName=UNSPECIFIED actionLabel=null actionId=0 initialSelStart=-1 initialSelEnd=-1 initialCapsMode=0x0 hintText=null label=null packageName=com.joao.ilha fieldId=-1 fieldName=null extras=null}, false)
+11-13 21:17:49.811   486  1771 W InputManager-JNI: Input channel object 'cb1211f Splash Screen com.joao.ilha (client)' was disposed without first being removed with the input manager!
+11-13 21:17:49.816   486   868 D CoreBackPreview: Window{cb1211f u0 Splash Screen com.joao.ilha EXITING}: Setting back callback null
+11-13 21:17:51.829  2870  2902 I com.joao.ilha: Background young concurrent copying GC freed 104483(2824KB) AllocSpace objects, 7(140KB) LOS objects, 31% free, 6175KB/9011KB, paused 26us,24us total 1.111s
