@@ -106,6 +106,9 @@ log "== Animações de atualização =="
 fechar; caso limpar; sleep 2
 caso intro; sleep 2; shot "notch-chuva"; sleep 5; shot "notch-mar"; sleep 5; shot "notch-penhasco"; sleep 5; shot "notch-letreiro"; sleep 5
 caso cavalo; sleep 2; shot "cavalo"; sleep 3; shot "cavalo-titulo"; sleep 3
+log "== Abertura do app (fumaça 1 bit) =="
+adb shell am force-stop $PKG; sleep 1; adb shell am start -n $PKG/.MainActivity >/dev/null; sleep 0.5; shot "abertura-1"; sleep 0.6; shot "abertura-2"; sleep 0.6; shot "abertura-3"; sleep 2.5; shot "abertura-depois"
+adb shell input keyevent KEYCODE_HOME; sleep 1
 log "== Travamentos =="
 log "serviço no fim: $(alive)"
 adb logcat -d -b crash > $OUT/travamentos.txt

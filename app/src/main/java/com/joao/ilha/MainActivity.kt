@@ -17,7 +17,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Prefs.init(this)
         enableEdgeToEdge()
+        // Abertura com fumaça em pixels só quando o app é aberto do zero (não ao girar a tela).
+        val opening = savedInstanceState == null && !intent.getBooleanExtra("sem_abertura", false)
         setContent {
+            var showOpening by remember { mutableStateOf(opening) }
+            if (showOpening) { OpeningSmoke { showOpening = false }; return@setContent }
             val s by Prefs.state.collectAsState()
             IlhaTheme(s.appTheme) {
                 val stack = remember { mutableStateListOf(Screen.Home) }

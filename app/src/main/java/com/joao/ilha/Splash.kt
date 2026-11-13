@@ -79,7 +79,7 @@ private fun DrawScope.grid(): Triple<Float, Int, Int> {
 }
 
 /** Letras 5×7 em pontos. */
-private val Glyphs = mapOf(
+internal val Glyphs = mapOf(
     'N' to listOf("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
     'O' to listOf("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
     'T' to listOf("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
